@@ -23,8 +23,11 @@ Projeto de referência que inspirou a implementação:
 **Fase 1 — Quality Gate no GitHub: ✅ concluída.**
 
 - Repositório: `joaopedropeira/fabric-ci-cd`
-- Projeto demo: `pbi-project/CustomerProfitabilitySample.pbip` (SemanticModel em TMDL + Report).
+- **Dois projetos demo:**
+  - `pbi-project/CustomerProfitabilitySample.pbip` — sample completo (SemanticModel em TMDL + Report), com fontes externas inacessíveis (ver seção 9.4).
+  - `pbi-project2/SalesDemo.pbip` — projeto **mínimo e self-contained** (CSV fictício + dados **inline** no M), criado para validar a integração **ponta a ponta** sem dependência externa.
 - Esteira implementada na branch `feature/ci-bpa-gate` (validada via PR).
+- **Validação incremental:** em cada PR, os gates rodam **apenas nos projetos PBIP que foram alterados** (ver seção 3.2). Numa execução **manual** (`workflow_dispatch`), todos os projetos são validados.
 
 Em cada **Pull Request para `main`**, a esteira:
 1. Baixa o **Tabular Editor 2**.
@@ -47,13 +50,14 @@ executa os passos e destrói as máquinas.
 
 ```mermaid
 flowchart LR
-    A[Abrir PR para main] --> M[Gate estático 1: Ubuntu<br/>PBIP metadata validation]
-    A --> R[Gate estático 2: Ubuntu<br/>Report rules - Fab Inspector]
+    A[Abrir PR para main] --> P[Discover_Projects: Ubuntu<br/>diff vs base → seleciona<br/>projetos PBIP alterados]
+    P --> M[Gate estático 1: Ubuntu<br/>PBIP metadata validation<br/>só projetos alterados]
+    P --> R[Gate estático 2: Ubuntu<br/>Report rules - Fab Inspector<br/>só projetos alterados]
     M -->|íntegro?| C[Get latest Tabular Editor 2<br/>needs metadata + report rules]
     R -->|report ok?| C
     M -->|❌ falha| X[Build falha - etapas seguintes nem rodam]
     R -->|❌ falha| X
-    C -->|output: download_url| D[BPA: Windows efêmero]
+    C -->|output: download_url| D[BPA: Windows efêmero<br/>só modelos alterados]
     D --> E[Roda BPA → classifica por severidade]
     E --> G[Comenta no PR + aplica label]
     G --> H{Severity 3?}
@@ -62,7 +66,8 @@ flowchart LR
 ```
 
 **Ordem de execução:**
-1. **Em paralelo** (gates estáticos que rodam nos arquivos): `Validate_PBIP_Metadata` e `Report_Rules_PBI_Inspector`.
+0. **`Discover_Projects`** (primeiro): compara o PR com a branch base e monta a lista de **projetos PBIP alterados** (output consumido pelos gates). Em run manual, seleciona **todos**.
+1. **Em paralelo** (gates estáticos, só nos projetos selecionados): `Validate_PBIP_Metadata` e `Report_Rules_PBI_Inspector`.
 2. **Na sequência** (só se os dois gates acima passarem): `Get_Latest_TabularEditor2_Download_Link` → `BPA`.
 
 Assim, os checks mais rápidos e baratos (sintaxe/integridade e relatório) rodam primeiro e **em paralelo**;
@@ -72,10 +77,11 @@ o BPA (mais pesado, baixa o TE2 e roda em Windows) só é acionado se a base est
 
 | Job | Runner | Ordem | O que faz |
 |---|---|---|---|
-| `Validate_PBIP_Metadata` | `ubuntu-latest` | 1 (paralelo) | Valida **integridade/sintaxe** dos arquivos PBIP (ver seção 4.1). |
-| `Report_Rules_PBI_Inspector` | `ubuntu-latest` | 1 (paralelo) | Baixa a CLI do **Fab Inspector** (PBI Inspector V2) e valida boas práticas do **relatório** (ver seção 4.2). |
+| `Discover_Projects` | `ubuntu-latest` | 0 | Faz `git diff` do PR vs. base e publica a lista de **projetos PBIP alterados** como *output* (`projects`). Em run manual, seleciona todos. |
+| `Validate_PBIP_Metadata` | `ubuntu-latest` | 1 (paralelo) | `needs` Discover. Valida **integridade/sintaxe** dos arquivos PBIP dos projetos alterados (ver seção 4.1). |
+| `Report_Rules_PBI_Inspector` | `ubuntu-latest` | 1 (paralelo) | `needs` Discover. Baixa a CLI do **Fab Inspector** (PBI Inspector V2) e valida boas práticas do **relatório** de cada projeto alterado (ver seção 4.2). |
 | `Get_Latest_TabularEditor2_Download_Link` | `ubuntu-latest` | 2 | `needs` os dois gates acima. Acha a última versão do Tabular Editor 2 e expõe a URL como *output*. |
-| `BPA` | `windows-latest` | 2 | `needs` Get_Latest. Baixa o TE2, roda a macro do BPA sobre o **modelo**, comenta no PR e falha se Severity 3. |
+| `BPA` | `windows-latest` | 2 | `needs` Get_Latest + Discover. Baixa o TE2, roda a macro do BPA sobre **cada modelo alterado**, comenta no PR e falha se Severity 3. |
 
 ### 3.1. Os dois gates estáticos paralelos — o que cada um valida
 
@@ -94,25 +100,76 @@ Ambos rodam **primeiro e em paralelo**, mas olham para **partes diferentes** do 
 > Em uma frase: o **metadata** garante que o projeto **abre e é portável**; o **report rules**
 > garante que o relatório está **bem construído visualmente**. O **BPA** (etapa 2) cuida do **modelo**.
 
+### 3.2. Validação incremental — só os projetos alterados
+
+Os gates são **dinâmicos** e **incrementais**: não há caminho fixo de projeto no workflow. O job
+`Discover_Projects` descobre **todos** os projetos PBIP do repo (qualquer pasta que contenha um `*.pbip`)
+e, num PR, seleciona **apenas os que mudaram**.
+
+**Como decide o que mudou:** faz `git diff --name-only origin/<base>...HEAD`, mapeia cada arquivo alterado
+para a raiz do seu projeto e monta a lista (`projects`, separada por espaço). Os gates iteram sobre essa
+lista.
+
+| Cenário | O que é validado |
+|---|---|
+| PR altera só `pbi-project2` | **apenas** `pbi-project2` (o `pbi-project` é ignorado) |
+| PR altera os dois projetos | ambos |
+| PR não toca nenhum projeto PBIP (ex.: só docs/scripts) | nada — os gates passam em *no-op* |
+| Execução manual (`workflow_dispatch`) | **todos** os projetos (fallback seguro) |
+
+**Por que isso importa:** um monorepo pode ter dezenas de projetos; validar tudo a cada PR seria lento e
+ruidoso. A validação incremental dá feedback focado (só no que você mexeu) e mantém o CI rápido. Adicionar
+um novo projeto PBIP **não exige mexer no workflow** — ele é descoberto automaticamente.
+
 ---
 
 ## 4. Os arquivos da pasta `scripts/`
+
+Os scripts estão **agrupados por gate** em subpastas:
+
+```
+scripts/
+├─ metadata_validation/   → gate de integridade dos arquivos PBIP
+│  ├─ pbip_metadata_validation.py
+│  └─ pbip_pr_comment.py
+├─ fab_validator/         → gate de boas práticas do relatório (Fab Inspector)
+│  ├─ fabinspector-report-rules.json
+│  └─ fabinspector_pr_comment.py
+└─ bpa/                   → gate de boas práticas do modelo (BPA)
+   ├─ Custom_TA_Macro_for_BPA.csx
+   ├─ BPA_Rules.json
+   ├─ bpa_rules.md
+   ├─ bpa_result_analysis.py
+   └─ pr_comment.py
+```
+
+### `metadata_validation/`
 
 | Arquivo | Responsabilidade |
 |---|---|
 | `pbip_metadata_validation.py` | **Validação estática de metadados** (roda antes do BPA). Checa integridade dos arquivos PBIP — ver seção 4.1. Sem dependências (só stdlib). |
 | `pbip_pr_comment.py` | Posta o resultado da validação de metadados como comentário no PR + label `metadata-*`. |
+
+### `fab_validator/`
+
+| Arquivo | Responsabilidade |
+|---|---|
 | `fabinspector-report-rules.json` | **Regras de relatório** (base rules oficiais do Fab Inspector / PBI Inspector V2). Customizável. |
 | `fabinspector_pr_comment.py` | Posta o resultado das regras de relatório como comentário no PR + label `reportrules-*`. |
+
+### `bpa/`
+
+| Arquivo | Responsabilidade |
+|---|---|
 | `Custom_TA_Macro_for_BPA.csx` | **Macro C#** do Tabular Editor. Abre o modelo (`TMDL_PATH`), carrega as regras do `BPA_Rules.json`, roda o BPA e exporta `BPA_Results.csv` (separado por TAB). |
 | `BPA_Rules.json` | **O "rulebook"** — as 75 regras, cada uma com `ID`, expressão de detecção e `CustomSeverity` (1/2/3). É o coração do gate. |
 | `bpa_result_analysis.py` | **Classificador.** Cruza o CSV com o JSON pelo `RuleID`, separa em `must_correct/correct_asap/nice_to_have.csv` e seta a variável `SEVERITY_3_FOUND` (que faz o gate reprovar). |
 | `pr_comment.py` | **Comunicador.** Monta o comentário em markdown, posta no PR via API do GitHub e aplica a label `bpa-*`. |
 | `bpa_rules.md` | **Documentação das regras** (descrições + âncoras). O `pr_comment.py` gera links apontando para este arquivo. |
 
-**Fluxo em uma frase:** a macro `.csx` usa o `BPA_Rules.json` para gerar o `BPA_Results.csv` →
+**Fluxo em uma frase:** a macro `.csx` usa o `bpa/BPA_Rules.json` para gerar o `BPA_Results.csv` →
 `bpa_result_analysis.py` classifica por severidade → `pr_comment.py` publica no PR (com links para o
-`bpa_rules.md`), enquanto `SEVERITY_3_FOUND` decide se o gate passa ou falha.
+`bpa/bpa_rules.md`), enquanto `SEVERITY_3_FOUND` decide se o gate passa ou falha.
 
 ### 4.1. PBIP metadata validation (`pbip_metadata_validation.py`)
 
@@ -132,7 +189,11 @@ Gate **estático** que roda **antes do BPA** — valida sintaxe e integridade do
    (checa via `git ls-files`, não a presença em disco).
 
 Falha (exit 1) em qualquer **erro**; *warnings* não reprovam. Rode local com
-`python scripts/pbip_metadata_validation.py`.
+`python scripts/metadata_validation/pbip_metadata_validation.py`.
+
+> **Multi-projeto:** o script aceita a env `PBIP_PROJECT_DIRS` (lista de pastas separadas por espaço/
+> vírgula) e valida **apenas** essas — é assim que a esteira roda só nos projetos alterados. Lista vazia
+> = "nada a validar" (passa). Sem essa env, cai no `PBIP_PROJECT_DIR` (default `pbi-project`) para runs locais.
 
 ### 4.2. Report rules — Fab Inspector / PBI Inspector V2 (`fabinspector-report-rules.json`)
 
@@ -141,7 +202,7 @@ metadata. Usa o **Fab Inspector** (evolução do PBI Inspector V2) em **modo loc
 `.Report` direto do checkout, **sem Fabric e sem autenticação**.
 
 - **Como roda:** o job baixa a CLI Linux do Fab Inspector e executa
-  `fab-inspector -fabricitem <.Report> -rules scripts/fabinspector-report-rules.json -formats "Console,GitHub"`.
+  `fab-inspector -fabricitem <.Report> -rules scripts/fab_validator/fabinspector-report-rules.json -formats "Console,GitHub"`.
 - **`-formats GitHub`** gera anotações inline no PR; o `-formats Console` é capturado para o comentário.
 - **Falha** o job quando há violação (exit code != 0), bloqueando as etapas seguintes.
 - **Regras** (`fabinspector-report-rules.json`): base rules oficiais, focadas em qualidade visual. Exemplos:
@@ -198,7 +259,7 @@ Exemplo real do nosso arquivo (a regra do `DIVIDE`):
 2. `Tools → Manage BPA Rules...` → selecione uma coleção com permissão de escrita.
 3. Clique **Add**, defina `Name`, `Category`, `Scope` e a **`Expression`** (o editor tem IntelliSense e botão de testar contra o modelo).
 4. Teste na aba do BPA (**F10**) para ver os objetos violando.
-5. **Exporte a coleção para JSON** e traga o conteúdo para o `scripts/BPA_Rules.json` — depois adicione os campos `CustomSeverity`, `ID` e `Anchor` (específicos da nossa esteira) e a descrição no `scripts/bpa_rules.md`.
+5. **Exporte a coleção para JSON** e traga o conteúdo para o `scripts/bpa/BPA_Rules.json` — depois adicione os campos `CustomSeverity`, `ID` e `Anchor` (específicos da nossa esteira) e a descrição no `scripts/bpa/bpa_rules.md`.
 
 > Dica: para "puxar" o ruleset oficial completo e atualizado para dentro do TE, rode na janela de
 > **Advanced Scripting** o script de download que o próprio repositório oficial fornece (baixa o
@@ -236,6 +297,9 @@ Para ajustar o rigor da demo, basta mudar o `CustomSeverity` de uma regra no `BP
 - [x] Falha por Severity 3
 - [x] **PBIP metadata validation** (gate estático antes do BPA) — ver seção 4.1
 - [x] **Report rules** com **PBI Inspector V2 / Fab Inspector** (boas práticas do relatório — estático)
+- [x] **Gates dinâmicos** — descobrem automaticamente todos os projetos PBIP do repo (sem caminho fixo)
+- [x] **Validação incremental** — rodam só nos projetos alterados no PR (job `Discover_Projects`) — ver seção 3.2
+- [x] **Segundo projeto demo** `pbi-project2/SalesDemo` (self-contained, dados inline) para teste ponta a ponta
 - [ ] (opcional) **Branch protection** exigindo o check verde antes do merge — ver seção 8.1
 - [ ] (opcional) Sincronizar `BPA_Rules.json` com a versão oficial mais recente
 
@@ -281,7 +345,7 @@ rules) nem tocam nos mesmos arquivos — o BPA só enxerga o `SemanticModel`, o 
 O PBI Inspector **V1 não suporta PBIR** — é preciso o **V2** (repositório separado).
 
 **Sequência recomendada:**
-- Fase 1 (estático, no PR): [1] metadata ✅ → [3] PBI Inspector V2 (próximo) → BPA já existe.
+- Fase 1 (estático, no PR): [1] metadata ✅ → [3] PBI Inspector V2 ✅ → [2] BPA ✅ (todos incrementais, só nos projetos alterados).
 - Fase 2 (dinâmico, exige Fabric Dev): [5] refresh → [4] DAX tests → [6] performance.
 
 ---
@@ -435,6 +499,11 @@ alinhe os tipos/valores das chaves, senão os relacionamentos resolvem em `(Blan
   repontar o M para ler de lá. Mais "Fabric-native", porém com passos manuais no portal.
 - **Opção C — Manter sem dados:** o CI/CD (BPA, metadata, report rules) **não precisa de dados** — valida
   a *definição*. Aceitável se o foco for só a esteira.
+
+> **Já aplicado no `pbi-project2`:** o segundo projeto demo (`SalesDemo`) implementa a **Opção A** — a
+> partição da tabela `Sales` usa `Table.FromRows(...)` com os dados espelhando o `data/sales.csv`. Por isso
+> ele faz **refresh em qualquer lugar** (Desktop e Fabric), **sem gateway** e sem fonte externa. É o modelo
+> de referência para tornar o `pbi-project` self-contained, se quisermos.
 
 ### Decisão registrada
 

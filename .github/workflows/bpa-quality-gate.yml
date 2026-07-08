@@ -81,7 +81,7 @@ jobs:
         env:
           # Space-separated list of changed projects (empty = nothing to validate).
           PBIP_PROJECT_DIRS: ${{ needs.Discover_Projects.outputs.projects }}
-        run: python scripts/pbip_metadata_validation.py
+        run: python scripts/metadata_validation/pbip_metadata_validation.py
 
       - name: Upload metadata validation result
         uses: actions/upload-artifact@v4
@@ -95,7 +95,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
-        run: python scripts/pbip_pr_comment.py
+        run: python scripts/metadata_validation/pbip_pr_comment.py
 
       - name: Fail if metadata validation failed
         if: env.METADATA_VALIDATION_FAILED == 'true'
@@ -162,7 +162,7 @@ jobs:
                 echo "===== Fab Inspector: ${report} =====" | tee -a fabinspector_console.txt
                 fab-inspector \
                   -fabricitem "${report}" \
-                  -rules "scripts/fabinspector-report-rules.json" \
+                  -rules "scripts/fab_validator/fabinspector-report-rules.json" \
                   -formats "Console,GitHub" | tee -a fabinspector_console.txt
                 code=${PIPESTATUS[0]}
                 echo "Fab Inspector exit code for ${report}: ${code}" | tee -a fabinspector_console.txt
@@ -188,7 +188,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
-        run: python scripts/fabinspector_pr_comment.py
+        run: python scripts/fab_validator/fabinspector_pr_comment.py
 
       - name: Fail if report rules failed
         if: env.REPORT_RULES_FAILED == 'true'
@@ -246,7 +246,7 @@ jobs:
           PROJECTS: ${{ needs.Discover_Projects.outputs.projects }}
         run: |
           set -e
-          SCRIPT_PATH="scripts/Custom_TA_Macro_for_BPA.csx"
+          SCRIPT_PATH="scripts/bpa/Custom_TA_Macro_for_BPA.csx"
           first=1
           : > combined_BPA_Results.csv
           if [ -n "${PROJECTS// /}" ]; then
@@ -288,7 +288,7 @@ jobs:
         run: pip install pandas requests tabulate
 
       - name: Run BPA result analysis
-        run: python scripts/bpa_result_analysis.py
+        run: python scripts/bpa/bpa_result_analysis.py
 
       - name: Upload Python artifacts
         uses: actions/upload-artifact@v4
@@ -305,7 +305,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
-        run: python scripts/pr_comment.py
+        run: python scripts/bpa/pr_comment.py
 
       - name: Fail if Severity 3 issues found
         if: env.SEVERITY_3_FOUND == 'true'

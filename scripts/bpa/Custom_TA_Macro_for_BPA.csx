@@ -17,7 +17,7 @@ Console.WriteLine("BPA Job started for model: " + tmdlPath);
 // Specify the base path and the file name separately
 var customRuleCollection = BestPracticeCollection.GetCollectionFromFile(
     ".",
-    "scripts/BPA_Rules.json"
+    "scripts/bpa/BPA_Rules.json"
 );
 
 // Instead of directly setting ExternalRuleCollections, use the method in the Analyzer class
