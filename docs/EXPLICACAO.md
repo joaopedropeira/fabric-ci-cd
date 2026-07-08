@@ -47,26 +47,52 @@ executa os passos e destrói as máquinas.
 
 ```mermaid
 flowchart LR
-    A[Abrir PR para main] --> V[Job 1: Ubuntu efêmero<br/>PBIP metadata validation]
-    V -->|arquivos íntegros?| C[Job 2: Ubuntu efêmero<br/>acha URL do Tabular Editor 2]
-    V -->|❌ falha| X[Build falha - BPA nem roda]
-    C -->|output: download_url| D[Job 3: Windows efêmero<br/>needs Jobs 1 e 2]
-    D --> E[Roda BPA → BPA_Results.csv]
-    E --> F[Classifica por severidade]
-    F --> G[Comenta no PR + aplica label]
+    A[Abrir PR para main] --> M[Gate estático 1: Ubuntu<br/>PBIP metadata validation]
+    A --> R[Gate estático 2: Ubuntu<br/>Report rules - Fab Inspector]
+    M -->|íntegro?| C[Get latest Tabular Editor 2<br/>needs metadata + report rules]
+    R -->|report ok?| C
+    M -->|❌ falha| X[Build falha - etapas seguintes nem rodam]
+    R -->|❌ falha| X
+    C -->|output: download_url| D[BPA: Windows efêmero]
+    D --> E[Roda BPA → classifica por severidade]
+    E --> G[Comenta no PR + aplica label]
     G --> H{Severity 3?}
     H -->|sim| I[❌ Falha o build - bloqueia merge]
     H -->|não| J[✅ Passa]
 ```
 
+**Ordem de execução:**
+1. **Em paralelo** (gates estáticos que rodam nos arquivos): `Validate_PBIP_Metadata` e `Report_Rules_PBI_Inspector`.
+2. **Na sequência** (só se os dois gates acima passarem): `Get_Latest_TabularEditor2_Download_Link` → `BPA`.
+
+Assim, os checks mais rápidos e baratos (sintaxe/integridade e relatório) rodam primeiro e **em paralelo**;
+o BPA (mais pesado, baixa o TE2 e roda em Windows) só é acionado se a base estiver sã.
+
 ### Os jobs do workflow (`.github/workflows/bpa-quality-gate.yml`)
 
-| Job | Runner | O que faz |
+| Job | Runner | Ordem | O que faz |
+|---|---|---|---|
+| `Validate_PBIP_Metadata` | `ubuntu-latest` | 1 (paralelo) | Valida **integridade/sintaxe** dos arquivos PBIP (ver seção 4.1). |
+| `Report_Rules_PBI_Inspector` | `ubuntu-latest` | 1 (paralelo) | Baixa a CLI do **Fab Inspector** (PBI Inspector V2) e valida boas práticas do **relatório** (ver seção 4.2). |
+| `Get_Latest_TabularEditor2_Download_Link` | `ubuntu-latest` | 2 | `needs` os dois gates acima. Acha a última versão do Tabular Editor 2 e expõe a URL como *output*. |
+| `BPA` | `windows-latest` | 2 | `needs` Get_Latest. Baixa o TE2, roda a macro do BPA sobre o **modelo**, comenta no PR e falha se Severity 3. |
+
+### 3.1. Os dois gates estáticos paralelos — o que cada um valida
+
+Ambos rodam **primeiro e em paralelo**, mas olham para **partes diferentes** do projeto e **não competem**:
+
+| Aspecto | `Validate_PBIP_Metadata` | `Report_Rules_PBI_Inspector` |
 |---|---|---|
-| `Validate_PBIP_Metadata` | `ubuntu-latest` | **Gate estático que roda primeiro.** Valida integridade dos arquivos PBIP (ver seção 4.1). Se falhar, os demais gates nem executam. |
-| `Report_Rules_PBI_Inspector` | `ubuntu-latest` | `needs` o metadata. Baixa a CLI do **Fab Inspector** (PBI Inspector V2) e valida boas práticas do **relatório**; comenta no PR e falha em violações. |
-| `Get_Latest_TabularEditor2_Download_Link` | `ubuntu-latest` | Consulta a API do GitHub para achar a última versão do Tabular Editor 2 e expõe a URL de download como *output*. |
-| `BPA` | `windows-latest` | `needs` metadata + Get_Latest. Baixa o TE2, roda a macro do BPA, gera os CSVs, comenta no PR e falha se Severity 3. |
+| **Pergunta que responde** | "Os arquivos estão **íntegros e bem-formados**?" | "O **relatório** segue boas práticas visuais?" |
+| **O que olha** | Estrutura de arquivos: `.pbip`, `.pbir`, `.pbism`, `.platform`, `report.json`, `version.json`, `pages.json`, TMDL | Conteúdo visual do **`.Report`**: visuais, páginas, cores, filtros, temas |
+| **Camada** | "Arquivo" (sintaxe/estrutura) — **antes** de qualquer análise semântica | "Relatório" (VisOps) — qualidade de UX/design |
+| **Ferramenta** | Script Python próprio (stdlib) | Fab Inspector CLI + `fabinspector-report-rules.json` |
+| **Toca no modelo semântico?** | Não (só valida existência do `.SemanticModel`) | Não |
+| **Toca no relatório?** | Só valida existência/JSON válido | **Sim** — é o foco dele |
+| **Exemplos de falha** | JSON quebrado, `.pbir` apontando para pasta inexistente, TMDL vazio, cache local commitado | Cores fora do tema, páginas "Page 1", muitos visuais por página, página oculta indevida |
+
+> Em uma frase: o **metadata** garante que o projeto **abre e é portável**; o **report rules**
+> garante que o relatório está **bem construído visualmente**. O **BPA** (etapa 2) cuida do **modelo**.
 
 ---
 
@@ -107,6 +133,24 @@ Gate **estático** que roda **antes do BPA** — valida sintaxe e integridade do
 
 Falha (exit 1) em qualquer **erro**; *warnings* não reprovam. Rode local com
 `python scripts/pbip_metadata_validation.py`.
+
+### 4.2. Report rules — Fab Inspector / PBI Inspector V2 (`fabinspector-report-rules.json`)
+
+Gate **estático** que valida a **camada visual do relatório** (VisOps), rodando **em paralelo** com o
+metadata. Usa o **Fab Inspector** (evolução do PBI Inspector V2) em **modo local** — lê os arquivos do
+`.Report` direto do checkout, **sem Fabric e sem autenticação**.
+
+- **Como roda:** o job baixa a CLI Linux do Fab Inspector e executa
+  `fab-inspector -fabricitem <.Report> -rules scripts/fabinspector-report-rules.json -formats "Console,GitHub"`.
+- **`-formats GitHub`** gera anotações inline no PR; o `-formats Console` é capturado para o comentário.
+- **Falha** o job quando há violação (exit code != 0), bloqueando as etapas seguintes.
+- **Regras** (`fabinspector-report-rules.json`): base rules oficiais, focadas em qualidade visual. Exemplos:
+  reduzir nº de visuais/página, evitar cores fora do tema, ocultar páginas de tooltip/drillthrough,
+  evitar páginas com nome padrão "Page 1", páginas que rolam verticalmente, alt-text (acessibilidade).
+- **Customização:** editar parâmetros (ex.: `paramMaxVisualsPerPage`) ou marcar `"disabled": true` numa regra.
+
+> Nota: apesar do nome "Fab", aqui ele é usado **puramente como testador de relatório PBI local** — o
+> V1 (nome antigo) não suporta o formato **PBIR**, por isso usamos o V2 (Fab Inspector).
 
 ---
 
