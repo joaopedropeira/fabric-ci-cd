@@ -388,6 +388,63 @@ repetitivo e óbvio (BPA), mas **deixar espaço para aprovação manual** em dec
 
 ---
 
+## 9.4. Dados no Fabric — por que o report fica vazio (e como resolver)
+
+**Sintoma:** ao integrar o PBIP com o Fabric (Git integration), o semantic model chega **só com a
+estrutura** (metadados); o report renderiza **sem dados**.
+
+**Causa raiz — dois fatos:**
+1. **O formato PBIP não guarda os dados**, apenas a definição (TMDL). O snapshot de dados fica no cache
+   local (`.pbi/cache.abf`, que está no `.gitignore`). Por isso o Fabric só recebe a estrutura e
+   precisaria fazer **refresh** para popular os dados.
+2. **As fontes de dados deste sample são inacessíveis.** O "Customer Profitability Sample" (Obvience/
+   Microsoft) é distribuído como `.pbix` com dados já importados; as queries M apontam para infra
+   **local/privada do autor** que ninguém alcança. Então o refresh no Fabric **falha** → sem dados.
+
+### Inventário das fontes por tabela
+
+| Tabela | Fonte no M | Reachable? |
+|---|---|---|
+| BU, Date, Executive, Fact, Industry, State | `Sql.Database(".", "IP", ...)` (SQL Server local do autor) | ❌ |
+| Customer | `Excel.Workbook(File.Contents("C:\Users\mad\Dropbox\...\dimCustomer.xlsx"))` | ❌ |
+| **Product, Scenario** | `Table.FromRows(Json.Document(Binary.Decompress(...)))` — **dados embutidos no próprio M** | ✅ |
+
+> Ou seja, **7 tabelas** precisam ser repontadas; **Product e Scenario já são self-contained** (o
+> próprio Power BI embute dimensões pequenas inline — é justamente o padrão que recomendamos abaixo).
+
+### Mapa de relacionamentos (para manter os dados consistentes ao repontar)
+
+```
+Fact[BU Key]        → BU[BU Key]            BU[Executive_id]  → Executive[ID]
+Fact[YearPeriod]    → Date[YearPeriod]      Customer[Industry ID] → Industry[ID]
+Fact[Scenario Key]  → Scenario[Scenario Key]  Customer[State]   → State[StateCode]
+Fact[Product Key]   → Product[Product Key]
+Fact[Customer Key]  → Customer[Customer]
+```
+
+⚠️ Atenção a tipos: `Fact[Product Key]` é **text**, mas `Product[Product Key]` é **int64** — ao repontar,
+alinhe os tipos/valores das chaves, senão os relacionamentos resolvem em `(Blank)`.
+
+### Como resolver (opções)
+
+- **Opção A — Dados mock self-contained (recomendada p/ demo):** reescrever a partição das 7 tabelas para
+  `Table.FromRows`/`#table` com dados inline (mesmo padrão que Product/Scenario já usam). Vantagem:
+  refresh funciona **em qualquer lugar** (Fabric incluso), sem dependência externa. Requer gerar dados
+  pequenos batendo com colunas/tipos e **chaves consistentes** com o mapa acima.
+- **Opção B — Fabric Lakehouse/OneLake:** subir os dados (CSV/Parquet) num Lakehouse do workspace dev e
+  repontar o M para ler de lá. Mais "Fabric-native", porém com passos manuais no portal.
+- **Opção C — Manter sem dados:** o CI/CD (BPA, metadata, report rules) **não precisa de dados** — valida
+  a *definição*. Aceitável se o foco for só a esteira.
+
+### Decisão registrada
+
+O modelo **não foi alterado automaticamente** de propósito: é uma mudança **all-or-nothing** em 7 tabelas
+interdependentes, com risco de "refresh OK porém tudo `(Blank)`", e **não é verificável sem abrir o
+Power BI / rodar um refresh real** no Fabric. Para não arriscar o artefato que a esteira de CI/CD usa,
+a correção fica documentada aqui, pronta para aplicar com validação (idealmente a Opção A ou B).
+
+---
+
 ## 10. Referências
 
 - Repositório de referência: https://github.com/vlpatkosdani/powerbi-cicd-with-githubactions-demos
