@@ -17,7 +17,7 @@ correct_asap = pd.read_csv('correct_asap.csv')
 nice_to_have = pd.read_csv('nice_to_have.csv')
 
 # --- Load Rules with anchors ---
-with open("scripts/BPA_Rules.json") as f:
+with open("scripts/bpa/BPA_Rules.json") as f:
     RULES = {r['Name']: r for r in json.load(f)}
 
 # --- Helpers ---
@@ -37,7 +37,7 @@ def format_violations(df, expanded=True):
     for rule, group in grouped:
         objects = group[['ObjectName', 'ObjectType']].dropna().drop_duplicates().values.tolist()
         anchor = get_anchor(rule)
-        rule_link = f"https://github.com/joaopedropeira/fabric-ci-cd/blob/main/scripts/bpa_rules.md#{anchor}"
+        rule_link = f"https://github.com/joaopedropeira/fabric-ci-cd/blob/main/scripts/bpa/bpa_rules.md#{anchor}"
 
         output.append(
             f"<details{' open' if expanded else ''}>\n"

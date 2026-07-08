@@ -7,7 +7,7 @@ csv_path = "BPA_Results.csv"  # <- your BPA output csv file
 csv_df = pd.read_csv(csv_path, sep="\t")
 
 # ---- Step 2: Load the JSON file (Rules with SuggestedSeverity)
-json_path = "scripts/BPA_Rules.json"  # <- your JSON file
+json_path = "scripts/bpa/BPA_Rules.json"  # <- your JSON file
 with open(json_path, 'r', encoding='utf-8') as f:
     rules_data = json.load(f)
 
