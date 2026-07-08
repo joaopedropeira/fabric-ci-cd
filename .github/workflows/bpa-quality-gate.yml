@@ -1,9 +1,12 @@
 name: Power BI Quality Gates
 
-# Static quality gates for the Power BI project on every Pull Request to main:
-#   1. PBIP metadata validation  -> file/structure integrity (runs first).
-#   2. Report rules (PBI Inspector / Fab Inspector) -> report visual best practices.
-#   3. BPA (Tabular Editor 2)      -> semantic model best practices; posts a
+# Static quality gates for the PBIP projects that CHANGED in a Pull Request to
+# main (incremental validation). A discovery job diffs the PR against the base
+# branch and selects only the affected projects; the gates then run just for
+# those (a manual workflow_dispatch validates every project):
+#   1. PBIP metadata validation  -> file/structure integrity.
+#   2. Report rules (PBI Inspector / Fab Inspector) -> loops changed .Report folders.
+#   3. BPA (Tabular Editor 2)      -> loops changed semantic models; posts a
 #      severity-grouped PR comment, applies a status label and fails the build
 #      if any Severity 3 (Must Correct) issue is found.
 # Report rules and BPA only run if metadata validation passes. Each gate posts
@@ -19,12 +22,48 @@ permissions:
   contents: read
   pull-requests: write
 
-env:
-  # Path (relative to repo root) of the semantic model to analyze.
-  TMDL_PATH: pbi-project/CustomerProfitabilitySample.SemanticModel/definition/database.tmdl
-
 jobs:
+  Discover_Projects:
+    runs-on: ubuntu-latest
+    outputs:
+      # Space-separated list of PBIP project root folders to validate.
+      projects: ${{ steps.detect.outputs.projects }}
+      count: ${{ steps.detect.outputs.count }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed PBIP projects
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Every PBIP project root (top-level folder that contains a *.pbip).
+          mapfile -t ALL < <(find . -name '*.pbip' -printf '%h\n' | sed 's|^\./||' | cut -d/ -f1 | sort -u)
+          echo "Projetos PBIP no repo: ${ALL[*]:-<nenhum>}"
+          SELECTED=()
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="${{ github.event.pull_request.base.ref }}"
+            git fetch --no-tags origin "$BASE_REF"
+            CHANGED="$(git diff --name-only "origin/${BASE_REF}...HEAD")"
+            echo "Arquivos alterados no PR:"; echo "$CHANGED"
+            for proj in "${ALL[@]}"; do
+              if echo "$CHANGED" | grep -q "^${proj}/"; then
+                SELECTED+=("$proj")
+              fi
+            done
+          else
+            # Execucao manual (workflow_dispatch): valida todos os projetos.
+            SELECTED=("${ALL[@]}")
+          fi
+          echo "Projetos selecionados para validacao: ${SELECTED[*]:-<nenhum>}"
+          echo "projects=${SELECTED[*]:-}" >> "$GITHUB_OUTPUT"
+          echo "count=${#SELECTED[@]}" >> "$GITHUB_OUTPUT"
+
   Validate_PBIP_Metadata:
+    needs: Discover_Projects
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -38,9 +77,10 @@ jobs:
       - name: Install Python dependencies
         run: pip install requests
 
-      - name: Validate PBIP metadata (static integrity checks)
+      - name: Validate PBIP metadata (static integrity checks, changed projects)
         env:
-          PBIP_PROJECT_DIR: pbi-project
+          # Space-separated list of changed projects (empty = nothing to validate).
+          PBIP_PROJECT_DIRS: ${{ needs.Discover_Projects.outputs.projects }}
         run: python scripts/pbip_metadata_validation.py
 
       - name: Upload metadata validation result
@@ -65,10 +105,9 @@ jobs:
         shell: bash
 
   Report_Rules_PBI_Inspector:
+    needs: Discover_Projects
     runs-on: ubuntu-latest
     env:
-      # Path (relative to repo root) of the .Report folder to inspect.
-      REPORT_PATH: pbi-project/CustomerProfitabilitySample.Report
       # Fab Inspector CLI release tag ('latest' or e.g. v3.4.0).
       FAB_INSPECTOR_VERSION: latest
     steps:
@@ -103,21 +142,38 @@ jobs:
           chmod +x "$FAB_INSP_BIN"
           sudo install -m 0755 "$FAB_INSP_BIN" /usr/local/bin/fab-inspector
 
-      - name: Run Fab Inspector (report rules)
+      - name: Run Fab Inspector (report rules, changed .Report folders)
         shell: bash
+        env:
+          PROJECTS: ${{ needs.Discover_Projects.outputs.projects }}
         run: |
           set +e
-          fab-inspector \
-            -fabricitem "${REPORT_PATH}" \
-            -rules "scripts/fabinspector-report-rules.json" \
-            -formats "Console,GitHub" | tee fabinspector_console.txt
-          code=${PIPESTATUS[0]}
-          echo "Fab Inspector exit code: ${code}"
-          if [ "$code" -ne 0 ]; then
-            echo "REPORT_RULES_FAILED=true" >> $GITHUB_ENV
+          : > fabinspector_console.txt
+          FAILED=false
+          FOUND=false
+          if [ -z "${PROJECTS// /}" ]; then
+            echo "Nenhum projeto alterado; nada a inspecionar." | tee -a fabinspector_console.txt
           else
-            echo "REPORT_RULES_FAILED=false" >> $GITHUB_ENV
+            # Inspect every .Report folder inside the changed projects only.
+            for proj in $PROJECTS; do
+              while IFS= read -r report; do
+                [ -z "$report" ] && continue
+                FOUND=true
+                echo "===== Fab Inspector: ${report} =====" | tee -a fabinspector_console.txt
+                fab-inspector \
+                  -fabricitem "${report}" \
+                  -rules "scripts/fabinspector-report-rules.json" \
+                  -formats "Console,GitHub" | tee -a fabinspector_console.txt
+                code=${PIPESTATUS[0]}
+                echo "Fab Inspector exit code for ${report}: ${code}" | tee -a fabinspector_console.txt
+                if [ "$code" -ne 0 ]; then FAILED=true; fi
+              done < <(find "$proj" -type d -name '*.Report' | sort)
+            done
+            if [ "$FOUND" != "true" ]; then
+              echo "Projetos alterados nao contem pastas .Report." | tee -a fabinspector_console.txt
+            fi
           fi
+          echo "REPORT_RULES_FAILED=$FAILED" >> $GITHUB_ENV
           exit 0
 
       - name: Upload Fab Inspector console output
@@ -165,7 +221,7 @@ jobs:
         shell: bash
 
   BPA:
-    needs: Get_Latest_TabularEditor2_Download_Link
+    needs: [Get_Latest_TabularEditor2_Download_Link, Discover_Projects]
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -184,13 +240,38 @@ jobs:
           echo "PREFIX=$(date +'%Y%m%d-%H%M')-${{ github.repository }}-${{ github.head_ref || github.ref_name }}" | sed 's/\//-/g' >> $GITHUB_ENV
         shell: bash
 
-      - name: Run BPA macro script
+      - name: Run BPA macro script (changed semantic models)
+        shell: bash
+        env:
+          PROJECTS: ${{ needs.Discover_Projects.outputs.projects }}
         run: |
-          setlocal
-          set "SCRIPT_PATH=%GITHUB_WORKSPACE%\scripts\Custom_TA_Macro_for_BPA.csx"
-          set "TMDL_PATH=%TMDL_PATH%"
-          .\TabularEditor\TabularEditor.exe "%TMDL_PATH%" -S "%SCRIPT_PATH%"
-        shell: cmd
+          set -e
+          SCRIPT_PATH="scripts/Custom_TA_Macro_for_BPA.csx"
+          first=1
+          : > combined_BPA_Results.csv
+          if [ -n "${PROJECTS// /}" ]; then
+            # Analyze every semantic model inside the changed projects only.
+            for proj in $PROJECTS; do
+              while IFS= read -r model; do
+                [ -z "$model" ] && continue
+                echo "===== BPA: ${model} ====="
+                TMDL_PATH="$model" ./TabularEditor/TabularEditor.exe "$model" -S "$SCRIPT_PATH"
+                if [ "$first" = "1" ]; then
+                  cat BPA_Results.csv > combined_BPA_Results.csv
+                  first=0
+                else
+                  tail -n +2 BPA_Results.csv >> combined_BPA_Results.csv
+                fi
+              done < <(find "$proj" -type f -path '*.SemanticModel/definition/database.tmdl' | sort)
+            done
+          fi
+          if [ ! -s combined_BPA_Results.csv ]; then
+            # No models analyzed -> header-only CSV so the analysis passes cleanly.
+            printf 'RuleCategory\tRuleID\tRuleName\tRuleDescription\tObjectName\tObjectType\tRuleSeverity\tHasFixExpression\n' > combined_BPA_Results.csv
+          fi
+          mv combined_BPA_Results.csv BPA_Results.csv
+          echo "Combined BPA results:"
+          cat BPA_Results.csv
 
       - name: Upload BPA CSV result
         uses: actions/upload-artifact@v4
