@@ -4,18 +4,16 @@ PBIP Metadata Validation
 Static integrity checks for a Power BI Project (.pbip) folder, meant to run as a
 CI gate BEFORE the BPA. Uses only the Python standard library (no pip install).
 
-Checks performed:
-  1. All *.json files under the project parse as valid JSON (well-formed).
-  2. .pbip artifacts point to existing .Report / .SemanticModel folders.
-  3. .pbir datasetReference.byPath points to an existing SemanticModel folder.
-  4. No absolute / non-portable paths (C:\\, \\\\UNC, file://) in path references.
-  5. Required files exist for each Report and SemanticModel item.
-  6. Format/version metadata present (version.json, .pbir/.pbism version).
-  7. TMDL core files (database.tmdl, model.tmdl) exist and are not empty.
-  8. Registered report resources (images/themes) referenced actually exist.
-  9. .gitignore hygiene: PBI local cache/settings are ignored and not committed.
+It produces:
+  * Human-readable console output (for the Actions log).
+  * A machine-readable results file (pbip_validation_results.json) consumed by
+    pbip_pr_comment.py to post a comment on the pull request.
+  * A GitHub Actions env var METADATA_VALIDATION_FAILED=true|false.
 
-Exit code 0 = all checks passed. Exit code 1 = one or more ERRORS found.
+In GitHub Actions the script always exits 0 (a later workflow step fails the job
+based on METADATA_VALIDATION_FAILED, so the PR comment can be posted first).
+When run locally it exits 1 on failure so developers get immediate feedback.
+
 Configure the project folder with the env var PBIP_PROJECT_DIR (default: pbi-project).
 """
 
@@ -26,27 +24,29 @@ import subprocess
 import sys
 
 PROJECT_DIR = os.environ.get("PBIP_PROJECT_DIR", "pbi-project")
+RESULTS_FILE = "pbip_validation_results.json"
 
-errors = []
-warnings = []
-checks_run = 0
-
-
-def err(msg):
-    errors.append(msg)
-
-
-def warn(msg):
-    warnings.append(msg)
-
-
-def ok(msg):
-    global checks_run
-    checks_run += 1
-    print(f"  [OK] {msg}")
-
+# Structured report: each entry describes one check.
+REPORT = []
 
 ABSOLUTE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]|^\\\\|^file://|^/", re.IGNORECASE)
+
+
+def add_result(title, what, why, status, details=None):
+    """status: 'pass' | 'fail' | 'warn'."""
+    REPORT.append({
+        "title": title,
+        "what": what,     # o que foi validado
+        "why": why,       # por que a validacao importa
+        "status": status,
+        "details": details or [],
+    })
+    icon = {"pass": "[OK]", "fail": "[FAIL]", "warn": "[WARN]"}[status]
+    print(f"\n{icon} {title}")
+    print(f"     O que: {what}")
+    print(f"     Porque: {why}")
+    for d in (details or []):
+        print(f"       - {d}")
 
 
 def load_json(path):
@@ -62,7 +62,7 @@ def rel(path):
 # Check 1: every *.json parses correctly
 # ---------------------------------------------------------------------------
 def check_json_well_formed():
-    print("\n== 1. JSON well-formed ==")
+    bad = []
     found = False
     for root, _dirs, files in os.walk(PROJECT_DIR):
         for name in files:
@@ -72,18 +72,25 @@ def check_json_well_formed():
                 try:
                     load_json(p)
                 except Exception as e:  # noqa: BLE001
-                    err(f"Invalid JSON: {rel(p)} -> {e}")
-    if found and not any("Invalid JSON" in e for e in errors):
-        ok("All *.json files parse successfully")
-    elif not found:
-        warn("No *.json files found under the project folder")
+                    bad.append(f"{rel(p)} -> {e}")
+    what = "Todos os arquivos *.json do projeto fazem parse (sintaxe valida)"
+    why = "JSON malformado quebra a leitura do PBIP e impede o deploy no Fabric"
+    if not found:
+        add_result("JSON bem-formado", what, why, "warn",
+                   ["Nenhum arquivo *.json encontrado"])
+    elif bad:
+        add_result("JSON bem-formado", what, why, "fail", bad)
+    else:
+        add_result("JSON bem-formado", what, why, "pass")
 
 
 # ---------------------------------------------------------------------------
 # Check 2 & 3: .pbip and .pbir references resolve
 # ---------------------------------------------------------------------------
 def check_pbip_references():
-    print("\n== 2/3. Project references resolve ==")
+    details = []
+    status = "pass"
+
     pbip_files = []
     for root, _dirs, files in os.walk(PROJECT_DIR):
         for name in files:
@@ -91,27 +98,28 @@ def check_pbip_references():
                 pbip_files.append(os.path.join(root, name))
 
     if not pbip_files:
-        err("No .pbip file found under the project folder")
-        return
+        details.append("Nenhum arquivo .pbip encontrado")
+        status = "fail"
 
     for pbip in pbip_files:
         base = os.path.dirname(pbip)
         try:
             data = load_json(pbip)
         except Exception as e:  # noqa: BLE001
-            err(f"Cannot read .pbip: {rel(pbip)} -> {e}")
+            details.append(f"Nao foi possivel ler {rel(pbip)} -> {e}")
+            status = "fail"
             continue
         for artifact in data.get("artifacts", []):
             for _kind, ref in artifact.items():
                 path = ref.get("path", "")
                 if ABSOLUTE_PATH_RE.match(path):
-                    err(f"Absolute/non-portable path in {rel(pbip)}: '{path}'")
+                    details.append(f"Caminho absoluto em {rel(pbip)}: '{path}'")
+                    status = "fail"
                 target = os.path.normpath(os.path.join(base, path))
                 if not os.path.isdir(target):
-                    err(f"{rel(pbip)} references missing folder: '{path}'")
-        ok(f"Validated .pbip references: {rel(pbip)}")
+                    details.append(f"{rel(pbip)} referencia pasta inexistente: '{path}'")
+                    status = "fail"
 
-    # .pbir dataset reference
     for root, _dirs, files in os.walk(PROJECT_DIR):
         for name in files:
             if name.lower().endswith(".pbir"):
@@ -119,28 +127,36 @@ def check_pbip_references():
                 try:
                     data = load_json(p)
                 except Exception as e:  # noqa: BLE001
-                    err(f"Cannot read .pbir: {rel(p)} -> {e}")
+                    details.append(f"Nao foi possivel ler {rel(p)} -> {e}")
+                    status = "fail"
                     continue
                 by_path = (data.get("datasetReference", {}) or {}).get("byPath")
                 if by_path:
                     path = by_path.get("path", "")
                     if ABSOLUTE_PATH_RE.match(path):
-                        err(f"Absolute/non-portable dataset path in {rel(p)}: '{path}'")
+                        details.append(f"Caminho absoluto de dataset em {rel(p)}: '{path}'")
+                        status = "fail"
                     target = os.path.normpath(os.path.join(os.path.dirname(p), path))
                     if not os.path.isdir(target):
-                        err(f"{rel(p)} dataset byPath missing: '{path}'")
-                    else:
-                        ok(f"Dataset reference resolves: {rel(p)} -> '{path}'")
-                # byConnection is valid too (deployed model) - just note it
+                        details.append(f"{rel(p)} dataset byPath inexistente: '{path}'")
+                        status = "fail"
                 elif (data.get("datasetReference", {}) or {}).get("byConnection"):
-                    warn(f"{rel(p)} uses byConnection (no local semantic model to validate)")
+                    details.append(f"{rel(p)} usa byConnection (modelo publicado, sem validacao local)")
+
+    add_result(
+        "Referencias do projeto",
+        "O .pbip e o .pbir apontam para pastas .Report/.SemanticModel existentes, com caminhos relativos",
+        "Referencia quebrada ou caminho absoluto impede abrir/portar o projeto em outra maquina",
+        status, details,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Check 5 & 6 & 7: required files, version metadata, TMDL non-empty
 # ---------------------------------------------------------------------------
 def check_required_files():
-    print("\n== 5/6/7. Required files, versions and TMDL ==")
+    details = []
+    status = "pass"
     for root, dirs, _files in os.walk(PROJECT_DIR):
         for d in dirs:
             full = os.path.join(root, d)
@@ -154,8 +170,8 @@ def check_required_files():
                 ]
                 for rq in required:
                     if not os.path.isfile(os.path.join(full, rq)):
-                        err(f"Report '{d}' missing required file: {rq}")
-                ok(f"Report structure checked: {d}")
+                        details.append(f"Report '{d}' sem arquivo obrigatorio: {rq}")
+                        status = "fail"
             if d.endswith(".SemanticModel"):
                 required = [
                     "definition.pbism",
@@ -166,25 +182,34 @@ def check_required_files():
                 for rq in required:
                     fp = os.path.join(full, rq)
                     if not os.path.isfile(fp):
-                        err(f"SemanticModel '{d}' missing required file: {rq}")
+                        details.append(f"SemanticModel '{d}' sem arquivo obrigatorio: {rq}")
+                        status = "fail"
                     elif rq.endswith(".tmdl") and os.path.getsize(fp) == 0:
-                        err(f"SemanticModel '{d}' has empty TMDL: {rq}")
-                ok(f"SemanticModel structure checked: {d}")
+                        details.append(f"SemanticModel '{d}' com TMDL vazio: {rq}")
+                        status = "fail"
+
+    add_result(
+        "Arquivos obrigatorios e TMDL",
+        "Cada Report/SemanticModel tem seus arquivos-chave (.pbir/.pbism, report.json, version.json, pages.json, model/database.tmdl, .platform) e TMDL nao vazio",
+        "A falta de um arquivo estrutural ou TMDL vazio corrompe o item e falha o deploy",
+        status, details,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Check 8: registered report resources exist
 # ---------------------------------------------------------------------------
 def check_report_resources():
-    print("\n== 8. Registered resources exist ==")
+    details = []
+    status = "pass"
     for root, _dirs, files in os.walk(PROJECT_DIR):
         if os.path.basename(root) == "definition" and "report.json" in files:
             report_json = os.path.join(root, "report.json")
-            report_folder = os.path.dirname(root)  # the .Report folder
+            report_folder = os.path.dirname(root)
             try:
                 data = load_json(report_json)
             except Exception:  # noqa: BLE001
-                continue  # already reported by check 1
+                continue
             for pkg in data.get("resourcePackages", []):
                 pkg_name = pkg.get("name", "RegisteredResources")
                 for item in pkg.get("items", []):
@@ -193,64 +218,103 @@ def check_report_resources():
                         report_folder, "StaticResources", pkg_name, item_path
                     )
                     if not os.path.isfile(resource_fp):
-                        err(
-                            f"Report resource referenced but missing: "
-                            f"{pkg_name}/{item_path}"
-                        )
-            ok(f"Report resources checked: {rel(report_json)}")
+                        details.append(f"Recurso referenciado mas ausente: {pkg_name}/{item_path}")
+                        status = "fail"
+
+    add_result(
+        "Recursos registrados existem",
+        "Imagens e temas listados em resourcePackages apontam para arquivos reais em StaticResources",
+        "Uma referencia quebrada de imagem/tema gera erro visual ou de carregamento no relatorio",
+        status, details,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Check 9: .gitignore hygiene
 # ---------------------------------------------------------------------------
 def check_gitignore_hygiene():
-    print("\n== 9. .gitignore hygiene ==")
-    gitignores = []
-    for candidate in (
-        os.path.join(PROJECT_DIR, ".gitignore"),
-        ".gitignore",
-    ):
-        if os.path.isfile(candidate):
-            gitignores.append(candidate)
+    details = []
+    status = "pass"
 
+    gitignores = [g for g in (os.path.join(PROJECT_DIR, ".gitignore"), ".gitignore")
+                  if os.path.isfile(g)]
     contents = ""
     for gi in gitignores:
         with open(gi, "r", encoding="utf-8-sig") as f:
             contents += f.read() + "\n"
 
     if not gitignores:
-        warn("No .gitignore found - PBI local cache files may get committed")
+        details.append("Nenhum .gitignore encontrado - cache/credenciais locais podem vazar")
+        status = "warn"
     else:
         for needle in ("localSettings.json", "cache.abf"):
             if needle not in contents:
-                warn(f".gitignore does not mention '{needle}'")
-        ok("Checked .gitignore for PBI cache/settings entries")
+                details.append(f".gitignore nao menciona '{needle}'")
+                if status == "pass":
+                    status = "warn"
 
-    # Ensure local-only artifacts are not TRACKED by git (committed).
-    # We check git tracking (not disk presence) so local working files that are
-    # correctly gitignored do not cause a false positive.
     try:
         tracked = subprocess.run(
-            ["git", "ls-files"],
-            capture_output=True, text=True, check=True,
+            ["git", "ls-files"], capture_output=True, text=True, check=True,
         ).stdout.splitlines()
-        committed_bad = [
-            f for f in tracked
-            if f.endswith("localSettings.json") or f.endswith(".abf")
-        ]
+        committed_bad = [f for f in tracked
+                         if f.endswith("localSettings.json") or f.endswith(".abf")]
         for f in committed_bad:
-            err(f"Local-only artifact is committed to git: {f}")
-        if not committed_bad:
-            ok("No PBI local cache/settings artifacts are committed")
+            details.append(f"Artefato local commitado indevidamente: {f}")
+            status = "fail"
     except (subprocess.CalledProcessError, FileNotFoundError):
-        warn("git not available - skipped tracked-artifact check")
+        details.append("git indisponivel - checagem de artefatos rastreados pulada")
+        if status == "pass":
+            status = "warn"
+
+    add_result(
+        "Higiene do .gitignore",
+        "Arquivos locais (localSettings.json, cache.abf) estao ignorados e NAO foram commitados",
+        "Cache e credenciais locais nao devem ser versionados (poluicao e risco de seguranca)",
+        status, details,
+    )
+
+
+def _finish(failed):
+    counts = {
+        "pass": sum(1 for r in REPORT if r["status"] == "pass"),
+        "warn": sum(1 for r in REPORT if r["status"] == "warn"),
+        "fail": sum(1 for r in REPORT if r["status"] == "fail"),
+    }
+    with open(RESULTS_FILE, "w", encoding="utf-8") as f:
+        json.dump({"failed": failed, "counts": counts, "checks": REPORT}, f,
+                  ensure_ascii=False, indent=2)
+
+    print("\n" + "=" * 60)
+    print(f"Resumo: {counts['pass']} ok, {counts['warn']} avisos, {counts['fail']} falhas")
+
+    # Signal the result to the workflow (a later step fails the job).
+    gh_env = os.environ.get("GITHUB_ENV")
+    if gh_env:
+        with open(gh_env, "a", encoding="utf-8") as env_file:
+            env_file.write(f"METADATA_VALIDATION_FAILED={'true' if failed else 'false'}\n")
+
+    print("PBIP metadata validation " + ("FAILED." if failed else "PASSED."))
+
+    # In CI, exit 0 so the comment step can run; the fail step handles the gate.
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        sys.exit(0)
+    sys.exit(1 if failed else 0)
 
 
 def main():
     print(f"PBIP Metadata Validation - project folder: '{PROJECT_DIR}'")
     if not os.path.isdir(PROJECT_DIR):
         print(f"::error::Project folder not found: {PROJECT_DIR}")
-        sys.exit(1)
+        REPORT.append({
+            "title": "Pasta do projeto",
+            "what": f"A pasta '{PROJECT_DIR}' existe",
+            "why": "Sem a pasta do projeto nao ha o que validar",
+            "status": "fail",
+            "details": [f"Pasta nao encontrada: {PROJECT_DIR}"],
+        })
+        _finish(failed=True)
+        return
 
     check_json_well_formed()
     check_pbip_references()
@@ -258,21 +322,8 @@ def main():
     check_report_resources()
     check_gitignore_hygiene()
 
-    print("\n" + "=" * 60)
-    if warnings:
-        print(f"WARNINGS ({len(warnings)}):")
-        for w in warnings:
-            print(f"  [WARN] {w}")
-    if errors:
-        print(f"\nERRORS ({len(errors)}):")
-        for e in errors:
-            print(f"  [ERROR] {e}")
-        print("\nPBIP metadata validation FAILED.")
-        sys.exit(1)
-
-    print(f"\nAll PBIP metadata checks passed ({checks_run} checks, "
-          f"{len(warnings)} warnings).")
-    sys.exit(0)
+    failed = any(r["status"] == "fail" for r in REPORT)
+    _finish(failed)
 
 
 if __name__ == "__main__":

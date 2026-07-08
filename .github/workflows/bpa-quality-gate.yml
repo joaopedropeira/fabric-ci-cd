@@ -33,10 +33,34 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Install Python dependencies
+        run: pip install requests
+
       - name: Validate PBIP metadata (static integrity checks)
         env:
           PBIP_PROJECT_DIR: pbi-project
         run: python scripts/pbip_metadata_validation.py
+
+      - name: Upload metadata validation result
+        uses: actions/upload-artifact@v4
+        with:
+          name: PBIP-Metadata-Validation-Result
+          path: pbip_validation_results.json
+
+      - name: Comment on Pull Request
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: python scripts/pbip_pr_comment.py
+
+      - name: Fail if metadata validation failed
+        if: env.METADATA_VALIDATION_FAILED == 'true'
+        run: |
+          echo "PBIP metadata validation found blocking issues."
+          exit 1
+        shell: bash
 
   Get_Latest_TabularEditor2_Download_Link:
     runs-on: ubuntu-latest
