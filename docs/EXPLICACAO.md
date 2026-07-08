@@ -59,13 +59,14 @@ flowchart LR
     H -->|não| J[✅ Passa]
 ```
 
-### Os 3 jobs do workflow (`.github/workflows/bpa-quality-gate.yml`)
+### Os jobs do workflow (`.github/workflows/bpa-quality-gate.yml`)
 
 | Job | Runner | O que faz |
 |---|---|---|
-| `Validate_PBIP_Metadata` | `ubuntu-latest` | **Gate estático que roda primeiro.** Valida integridade dos arquivos PBIP (ver seção 4.1). Se falhar, o BPA nem executa. |
+| `Validate_PBIP_Metadata` | `ubuntu-latest` | **Gate estático que roda primeiro.** Valida integridade dos arquivos PBIP (ver seção 4.1). Se falhar, os demais gates nem executam. |
+| `Report_Rules_PBI_Inspector` | `ubuntu-latest` | `needs` o metadata. Baixa a CLI do **Fab Inspector** (PBI Inspector V2) e valida boas práticas do **relatório**; comenta no PR e falha em violações. |
 | `Get_Latest_TabularEditor2_Download_Link` | `ubuntu-latest` | Consulta a API do GitHub para achar a última versão do Tabular Editor 2 e expõe a URL de download como *output*. |
-| `BPA` | `windows-latest` | `needs` os jobs 1 e 2. Baixa o TE2, roda a macro do BPA, gera os CSVs, comenta no PR e falha se Severity 3. |
+| `BPA` | `windows-latest` | `needs` metadata + Get_Latest. Baixa o TE2, roda a macro do BPA, gera os CSVs, comenta no PR e falha se Severity 3. |
 
 ---
 
@@ -74,6 +75,9 @@ flowchart LR
 | Arquivo | Responsabilidade |
 |---|---|
 | `pbip_metadata_validation.py` | **Validação estática de metadados** (roda antes do BPA). Checa integridade dos arquivos PBIP — ver seção 4.1. Sem dependências (só stdlib). |
+| `pbip_pr_comment.py` | Posta o resultado da validação de metadados como comentário no PR + label `metadata-*`. |
+| `fabinspector-report-rules.json` | **Regras de relatório** (base rules oficiais do Fab Inspector / PBI Inspector V2). Customizável. |
+| `fabinspector_pr_comment.py` | Posta o resultado das regras de relatório como comentário no PR + label `reportrules-*`. |
 | `Custom_TA_Macro_for_BPA.csx` | **Macro C#** do Tabular Editor. Abre o modelo (`TMDL_PATH`), carrega as regras do `BPA_Rules.json`, roda o BPA e exporta `BPA_Results.csv` (separado por TAB). |
 | `BPA_Rules.json` | **O "rulebook"** — as 75 regras, cada uma com `ID`, expressão de detecção e `CustomSeverity` (1/2/3). É o coração do gate. |
 | `bpa_result_analysis.py` | **Classificador.** Cruza o CSV com o JSON pelo `RuleID`, separa em `must_correct/correct_asap/nice_to_have.csv` e seta a variável `SEVERITY_3_FOUND` (que faz o gate reprovar). |
@@ -187,7 +191,7 @@ Para ajustar o rigor da demo, basta mudar o `CustomSeverity` de uma regra no `BP
 - [x] Comentário automático + labels no PR
 - [x] Falha por Severity 3
 - [x] **PBIP metadata validation** (gate estático antes do BPA) — ver seção 4.1
-- [ ] **Report rules** com **PBI Inspector V2** (boas práticas do relatório — estático) — ver seção 8.2
+- [x] **Report rules** com **PBI Inspector V2 / Fab Inspector** (boas práticas do relatório — estático)
 - [ ] (opcional) **Branch protection** exigindo o check verde antes do merge — ver seção 8.1
 - [ ] (opcional) Sincronizar `BPA_Rules.json` com a versão oficial mais recente
 

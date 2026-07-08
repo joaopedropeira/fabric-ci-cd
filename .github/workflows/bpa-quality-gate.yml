@@ -2,10 +2,12 @@ name: Power BI Quality Gates
 
 # Static quality gates for the Power BI project on every Pull Request to main:
 #   1. PBIP metadata validation  -> file/structure integrity (runs first).
-#   2. BPA (Tabular Editor 2)     -> semantic model best practices; posts a
+#   2. Report rules (PBI Inspector / Fab Inspector) -> report visual best practices.
+#   3. BPA (Tabular Editor 2)      -> semantic model best practices; posts a
 #      severity-grouped PR comment, applies a status label and fails the build
 #      if any Severity 3 (Must Correct) issue is found.
-# The BPA job only runs if metadata validation passes.
+# Report rules and BPA only run if metadata validation passes. Each gate posts
+# its own PR comment and status label.
 
 on:
   workflow_dispatch:
@@ -59,6 +61,84 @@ jobs:
         if: env.METADATA_VALIDATION_FAILED == 'true'
         run: |
           echo "PBIP metadata validation found blocking issues."
+          exit 1
+        shell: bash
+
+  Report_Rules_PBI_Inspector:
+    needs: Validate_PBIP_Metadata
+    runs-on: ubuntu-latest
+    env:
+      # Path (relative to repo root) of the .Report folder to inspect.
+      REPORT_PATH: pbi-project/CustomerProfitabilitySample.Report
+      # Fab Inspector CLI release tag ('latest' or e.g. v3.4.0).
+      FAB_INSPECTOR_VERSION: latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Python dependencies
+        run: pip install requests
+
+      - name: Download and install Fab Inspector CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update && sudo apt-get install -y unzip
+          VERSION="${FAB_INSPECTOR_VERSION}"
+          if [ "$VERSION" = "latest" ]; then
+            VERSION="$(curl -fsSL https://api.github.com/repos/NatVanG/fab-inspector/releases/latest | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')"
+          fi
+          DOWNLOAD_URL="https://github.com/NatVanG/fab-inspector/releases/download/${VERSION}/linux-x64-FabInspCLI.zip"
+          echo "Using Fab Inspector release: ${VERSION}"
+          curl -fL "$DOWNLOAD_URL" -o FabInspCLI.zip
+          unzip -o FabInspCLI.zip -d fab-inspector-cli
+          FAB_INSP_BIN="$(find fab-inspector-cli -type f \( -name fab-inspector -o -name FabInspCLI \) | head -n 1)"
+          if [ -z "$FAB_INSP_BIN" ]; then
+            echo "Fab Inspector executable not found after unzip." && unzip -l FabInspCLI.zip && exit 1
+          fi
+          chmod +x "$FAB_INSP_BIN"
+          sudo install -m 0755 "$FAB_INSP_BIN" /usr/local/bin/fab-inspector
+
+      - name: Run Fab Inspector (report rules)
+        shell: bash
+        run: |
+          set +e
+          fab-inspector \
+            -fabricitem "${REPORT_PATH}" \
+            -rules "scripts/fabinspector-report-rules.json" \
+            -formats "Console,GitHub" | tee fabinspector_console.txt
+          code=${PIPESTATUS[0]}
+          echo "Fab Inspector exit code: ${code}"
+          if [ "$code" -ne 0 ]; then
+            echo "REPORT_RULES_FAILED=true" >> $GITHUB_ENV
+          else
+            echo "REPORT_RULES_FAILED=false" >> $GITHUB_ENV
+          fi
+          exit 0
+
+      - name: Upload Fab Inspector console output
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fab-Inspector-Report-Rules-Result
+          path: fabinspector_console.txt
+
+      - name: Comment on Pull Request
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: python scripts/fabinspector_pr_comment.py
+
+      - name: Fail if report rules failed
+        if: env.REPORT_RULES_FAILED == 'true'
+        run: |
+          echo "Fab Inspector found report rule violations."
           exit 1
         shell: bash
 
