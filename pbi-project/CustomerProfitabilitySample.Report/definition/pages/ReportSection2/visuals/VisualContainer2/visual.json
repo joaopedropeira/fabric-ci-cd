@@ -1,0 +1,36 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+  "name": "VisualContainer2",
+  "position": {
+    "x": 10.352941176470589,
+    "y": 92.045454545454547,
+    "z": 2000,
+    "height": 138.06818181818181,
+    "width": 136.47058823529412
+  },
+  "visual": {
+    "visualType": "slicer",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Executive"
+                    }
+                  },
+                  "Property": "Name"
+                }
+              },
+              "queryRef": "Executive.Name",
+              "active": true
+            }
+          ]
+        }
+      }
+    }
+  }
+}

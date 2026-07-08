@@ -1,0 +1,28 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation __PBI_TimeIntelligenceEnabled = 1
+
+annotation PBI_QueryOrder = ["Fact","BU","Date","Scenario","Product","Customer","Industry","Executive","State"]
+
+annotation PBI_ProTooling = ["DevMode"]
+
+ref table Fact
+ref table BU
+ref table Date
+ref table Scenario
+ref table Product
+ref table Customer
+ref table Industry
+ref table Executive
+ref table State
+ref table DateTableTemplate_fe310476-3bb5-422b-85ff-9fd23f2cad67
+ref table LocalDateTable_39c22ddb-27f3-4e6c-8a44-a3380850fcb4
+
+ref cultureInfo en-US
+

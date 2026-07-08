@@ -1,0 +1,38 @@
+table Product
+	lineageTag: 9bd74bd8-d55c-4d93-a50d-130bfb330ccf
+
+	column 'Product Key'
+		dataType: int64
+		isHidden
+		lineageTag: 379e55e9-3cca-453e-b718-3f3fd755a25c
+		summarizeBy: none
+		sourceColumn: Product Key
+
+		annotation DataTypeAtRefresh = Int64#####not a type
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column Product
+		dataType: string
+		lineageTag: 20181f6f-5e3e-4fc6-96f2-84713a2dca01
+		summarizeBy: none
+		sourceColumn: Product
+
+		annotation DataTypeAtRefresh = String#####not a type
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isText":true}
+
+	partition Product = m
+		mode: import
+		source =
+				let
+				    Source = Table.FromRows(Json.Document(Binary.Decompress(Binary.FromText("i45WMjRQ0lEKzi9LVIrViVYyAvECijJzS4vBfGMQ3yW/KD8dIm8C4rvnJKZkQhVYgAR8PXXNjSBcI5B8aV5eapFSbCwA", BinaryEncoding.Base64), Compression.Deflate))),
+				    #"Renamed Columns" = Table.RenameColumns(Source, {{"Column1", "Product Key"}, {"Column2", "Product"}}),
+				    #"Changed Type" = Table.TransformColumnTypes(#"Renamed Columns", {{"Product Key", Int64.Type}, {"Product", type text}})
+				 in
+				    #"Changed Type"
+

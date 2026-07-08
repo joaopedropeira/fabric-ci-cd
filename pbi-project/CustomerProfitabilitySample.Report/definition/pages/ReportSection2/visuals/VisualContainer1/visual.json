@@ -1,0 +1,38 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+  "name": "VisualContainer1",
+  "position": {
+    "x": 1134.5739471106758,
+    "y": 679.49069539666993,
+    "z": 0,
+    "height": 33.84916748285994,
+    "width": 136.65034280117533
+  },
+  "visual": {
+    "visualType": "textbox",
+    "objects": {
+      "general": [
+        {
+          "properties": {
+            "paragraphs": [
+              {
+                "textRuns": [
+                  {
+                    "value": "obviEnce ©",
+                    "textStyle": {
+                      "fontFamily": "Lucida Sans Unicode",
+                      "fontSize": "8pt",
+                      "fontStyle": "normal",
+                      "fontWeight": "normal"
+                    }
+                  }
+                ],
+                "horizontalTextAlignment": "right"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

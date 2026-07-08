@@ -1,0 +1,38 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+  "name": "VisualContainer",
+  "position": {
+    "x": 18.805093046033303,
+    "y": 12.536728697355535,
+    "z": 1000,
+    "height": 63.937316356513229,
+    "width": 521.5279138099902
+  },
+  "visual": {
+    "visualType": "textbox",
+    "objects": {
+      "general": [
+        {
+          "properties": {
+            "paragraphs": [
+              {
+                "textRuns": [
+                  {
+                    "value": "Team Scorecard",
+                    "textStyle": {
+                      "fontFamily": "Heading",
+                      "fontSize": "28pt",
+                      "fontStyle": "normal",
+                      "fontWeight": "normal"
+                    }
+                  }
+                ],
+                "horizontalTextAlignment": "center"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+  "name": "VisualContainer3",
+  "position": {
+    "x": 0,
+    "y": 82.742409402546528,
+    "z": 3000,
+    "height": 384.87757100881493,
+    "width": 165.48481880509306
+  },
+  "visual": {
+    "visualType": "slicer",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Industry"
+                    }
+                  },
+                  "Property": "Industry"
+                }
+              },
+              "queryRef": "Industry.Industry",
+              "active": true
+            }
+          ]
+        }
+      }
+    }
+  }
+}

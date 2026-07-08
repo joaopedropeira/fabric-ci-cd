@@ -1,0 +1,124 @@
+table Customer
+	lineageTag: e82d348c-3eb1-474c-8acf-3ccde282752d
+
+	column Customer
+		dataType: double
+		isHidden
+		lineageTag: c52ed7f6-a5c0-4e8d-95a7-545bc46f7630
+		summarizeBy: none
+		sourceColumn: Customer
+
+		annotation DataTypeAtRefresh = Double#####not a type
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column Country/Region
+		dataType: string
+		lineageTag: a3a29260-0b51-45f2-8b1e-4ac6a41fe184
+		summarizeBy: none
+		sourceColumn: Country/Region
+
+		annotation DataTypeAtRefresh = String#####not a type
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isText":true}
+
+	column Name
+		dataType: string
+		lineageTag: 871813f3-5f55-464f-af02-c0f27fcfb158
+		summarizeBy: none
+		sourceColumn: Name
+
+		annotation DataTypeAtRefresh = String#####not a type
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isText":true}
+
+	column City
+		dataType: string
+		lineageTag: 52e69073-50ce-4076-9e2c-51c6a89dbb3e
+		dataCategory: City
+		summarizeBy: none
+		sourceColumn: City
+
+		annotation DataTypeAtRefresh = String#####not a type
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isText":true}
+
+	column 'Postal Code'
+		dataType: double
+		lineageTag: 361fea47-d9b7-4e48-87e5-45c1739b1f78
+		dataCategory: PostalCode
+		summarizeBy: count
+		sourceColumn: Postal Code
+
+		annotation DataTypeAtRefresh = Double#####not a type
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column State
+		dataType: string
+		lineageTag: 768ed2d1-2d4c-444d-bad3-d845772127af
+		dataCategory: StateOrProvince
+		summarizeBy: none
+		sourceColumn: State
+
+		annotation DataTypeAtRefresh = String#####not a type
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isText":true}
+
+	column 'Industry ID'
+		dataType: double
+		isHidden
+		lineageTag: 86c861d6-49df-481a-b6a7-ed376dff23ca
+		summarizeBy: none
+		sourceColumn: Industry ID
+
+		annotation DataTypeAtRefresh = Double#####not a type
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	hierarchy CustomerHierarchy
+		lineageTag: 4c432746-54a9-439f-b647-f2a26567ef11
+
+		level Country
+			lineageTag: d72716de-ddde-4cc4-bf97-64cbaaae0218
+			column: Country/Region
+
+		level State
+			lineageTag: 15d4f2e0-f35b-4790-8371-9ef7c86664a0
+			column: State
+
+		level City
+			lineageTag: fe0bdf09-891b-4873-8161-488bbcb122a9
+			column: City
+
+		level 'Postal Code'
+			lineageTag: b0f69d7b-6c73-4e5a-9214-e9ef48932b6f
+			column: 'Postal Code'
+
+		level Customer
+			lineageTag: 197de489-cd69-4392-8175-163c925e7ce0
+			column: Customer
+
+	partition Customer = m
+		source =
+				let
+				    Source = Excel.Workbook(File.Contents("C:\Users\mad\Dropbox\Work\Obvience\IP\Customer and Product Profitability\Data\dimCustomer.xlsx"), null, true),
+				    Sheet = Source{[Item="Sheet1",Kind="Sheet"]}[Data],
+				    #"Promoted Headers" = Table.PromoteHeaders(Sheet),
+				    #"Renamed Columns" = Table.RenameColumns(#"Promoted Headers", {{"Customer", "Customer"}, {"Country", "Country/Region"}, {"Name", "Name"}, {"City", "City"}, {"Postal Code", "Postal Code"}, {"State", "State"}, {"Industry ID", "Industry ID"}}),
+				    #"Changed Type" = Table.TransformColumnTypes(#"Renamed Columns", {{"Customer", type number}, {"Country/Region", type text}, {"Name", type text}, {"City", type text}, {"Postal Code", type number}, {"State", type text}, {"Industry ID", type number}})
+				 in
+				    #"Changed Type"
+
