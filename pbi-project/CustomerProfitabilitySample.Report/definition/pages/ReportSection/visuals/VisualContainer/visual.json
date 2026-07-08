@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
   "name": "VisualContainer",
   "position": {
-    "x": 9.4117647058823533,
+    "x": 10.019880715705765,
     "y": 0,
     "z": 0,
-    "height": 62.38636363636364,
-    "width": 510.11764705882354
+    "height": 62.982107355864812,
+    "width": 568.27037773359848
   },
   "visual": {
     "visualType": "textbox",
@@ -18,12 +18,10 @@
               {
                 "textRuns": [
                   {
-                    "value": "Industry Margin Analysis",
+                    "value": "Pagina: Industry Margin Analysis",
                     "textStyle": {
-                      "fontFamily": "Heading",
-                      "fontSize": "28pt",
-                      "fontStyle": "normal",
-                      "fontWeight": "normal"
+                      "fontFamily": "Segoe UI Light",
+                      "fontSize": "28pt"
                     }
                   }
                 ],
