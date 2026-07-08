@@ -1,9 +1,11 @@
 name: Power BI Quality Gates
 
-# Static quality gates for the Power BI project on every Pull Request to main:
-#   1. PBIP metadata validation  -> file/structure integrity (runs first).
-#   2. Report rules (PBI Inspector / Fab Inspector) -> report visual best practices.
-#   3. BPA (Tabular Editor 2)      -> semantic model best practices; posts a
+# Static quality gates for EVERY PBIP project in the repo, on each Pull Request
+# to main. The gates auto-discover all projects (any *.SemanticModel / *.Report
+# folder), so new projects (e.g. pbi-project2) are validated with no config:
+#   1. PBIP metadata validation  -> file/structure integrity (whole repo).
+#   2. Report rules (PBI Inspector / Fab Inspector) -> loops every .Report folder.
+#   3. BPA (Tabular Editor 2)      -> loops every semantic model; posts a
 #      severity-grouped PR comment, applies a status label and fails the build
 #      if any Severity 3 (Must Correct) issue is found.
 # Report rules and BPA only run if metadata validation passes. Each gate posts
@@ -18,10 +20,6 @@ on:
 permissions:
   contents: read
   pull-requests: write
-
-env:
-  # Path (relative to repo root) of the semantic model to analyze.
-  TMDL_PATH: pbi-project/CustomerProfitabilitySample.SemanticModel/definition/database.tmdl
 
 jobs:
   Validate_PBIP_Metadata:
@@ -38,9 +36,10 @@ jobs:
       - name: Install Python dependencies
         run: pip install requests
 
-      - name: Validate PBIP metadata (static integrity checks)
+      - name: Validate PBIP metadata (static integrity checks, all projects)
         env:
-          PBIP_PROJECT_DIR: pbi-project
+          # '.' = scan the whole repo so every PBIP project is validated.
+          PBIP_PROJECT_DIR: .
         run: python scripts/pbip_metadata_validation.py
 
       - name: Upload metadata validation result
@@ -67,8 +66,6 @@ jobs:
   Report_Rules_PBI_Inspector:
     runs-on: ubuntu-latest
     env:
-      # Path (relative to repo root) of the .Report folder to inspect.
-      REPORT_PATH: pbi-project/CustomerProfitabilitySample.Report
       # Fab Inspector CLI release tag ('latest' or e.g. v3.4.0).
       FAB_INSPECTOR_VERSION: latest
     steps:
@@ -103,21 +100,30 @@ jobs:
           chmod +x "$FAB_INSP_BIN"
           sudo install -m 0755 "$FAB_INSP_BIN" /usr/local/bin/fab-inspector
 
-      - name: Run Fab Inspector (report rules)
+      - name: Run Fab Inspector (report rules, every .Report folder)
         shell: bash
         run: |
           set +e
-          fab-inspector \
-            -fabricitem "${REPORT_PATH}" \
-            -rules "scripts/fabinspector-report-rules.json" \
-            -formats "Console,GitHub" | tee fabinspector_console.txt
-          code=${PIPESTATUS[0]}
-          echo "Fab Inspector exit code: ${code}"
-          if [ "$code" -ne 0 ]; then
-            echo "REPORT_RULES_FAILED=true" >> $GITHUB_ENV
-          else
-            echo "REPORT_RULES_FAILED=false" >> $GITHUB_ENV
+          : > fabinspector_console.txt
+          FAILED=false
+          FOUND=false
+          # Discover every report item in the repo and inspect each one.
+          while IFS= read -r report; do
+            [ -z "$report" ] && continue
+            FOUND=true
+            echo "===== Fab Inspector: ${report} =====" | tee -a fabinspector_console.txt
+            fab-inspector \
+              -fabricitem "${report}" \
+              -rules "scripts/fabinspector-report-rules.json" \
+              -formats "Console,GitHub" | tee -a fabinspector_console.txt
+            code=${PIPESTATUS[0]}
+            echo "Fab Inspector exit code for ${report}: ${code}" | tee -a fabinspector_console.txt
+            if [ "$code" -ne 0 ]; then FAILED=true; fi
+          done < <(find . -type d -name '*.Report' | sort)
+          if [ "$FOUND" != "true" ]; then
+            echo "No .Report folders found to inspect." | tee -a fabinspector_console.txt
           fi
+          echo "REPORT_RULES_FAILED=$FAILED" >> $GITHUB_ENV
           exit 0
 
       - name: Upload Fab Inspector console output
@@ -184,13 +190,28 @@ jobs:
           echo "PREFIX=$(date +'%Y%m%d-%H%M')-${{ github.repository }}-${{ github.head_ref || github.ref_name }}" | sed 's/\//-/g' >> $GITHUB_ENV
         shell: bash
 
-      - name: Run BPA macro script
+      - name: Run BPA macro script (every semantic model)
+        shell: bash
         run: |
-          setlocal
-          set "SCRIPT_PATH=%GITHUB_WORKSPACE%\scripts\Custom_TA_Macro_for_BPA.csx"
-          set "TMDL_PATH=%TMDL_PATH%"
-          .\TabularEditor\TabularEditor.exe "%TMDL_PATH%" -S "%SCRIPT_PATH%"
-        shell: cmd
+          set -e
+          SCRIPT_PATH="scripts/Custom_TA_Macro_for_BPA.csx"
+          first=1
+          : > combined_BPA_Results.csv
+          # Discover every semantic model in the repo and analyze each one.
+          while IFS= read -r model; do
+            [ -z "$model" ] && continue
+            echo "===== BPA: ${model} ====="
+            TMDL_PATH="$model" ./TabularEditor/TabularEditor.exe "$model" -S "$SCRIPT_PATH"
+            if [ "$first" = "1" ]; then
+              cat BPA_Results.csv > combined_BPA_Results.csv
+              first=0
+            else
+              tail -n +2 BPA_Results.csv >> combined_BPA_Results.csv
+            fi
+          done < <(find . -type f -path '*.SemanticModel/definition/database.tmdl' | sort)
+          mv combined_BPA_Results.csv BPA_Results.csv
+          echo "Combined BPA results:"
+          cat BPA_Results.csv
 
       - name: Upload BPA CSV result
         uses: actions/upload-artifact@v4
