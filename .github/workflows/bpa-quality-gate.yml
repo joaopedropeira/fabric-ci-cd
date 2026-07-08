@@ -1,9 +1,11 @@
-name: Power BI BPA Quality Gate
+name: Power BI Quality Gates
 
-# Runs the Tabular Editor 2 Best Practice Analyzer (BPA) against the Power BI
-# semantic model on every Pull Request to main, posts a structured comment on
-# the PR with the results grouped by severity, applies a status label and fails
-# the build if any Severity 3 (Must Correct) issue is found.
+# Static quality gates for the Power BI project on every Pull Request to main:
+#   1. PBIP metadata validation  -> file/structure integrity (runs first).
+#   2. BPA (Tabular Editor 2)     -> semantic model best practices; posts a
+#      severity-grouped PR comment, applies a status label and fails the build
+#      if any Severity 3 (Must Correct) issue is found.
+# The BPA job only runs if metadata validation passes.
 
 on:
   workflow_dispatch:
@@ -20,6 +22,22 @@ env:
   TMDL_PATH: pbi-project/CustomerProfitabilitySample.SemanticModel/definition/database.tmdl
 
 jobs:
+  Validate_PBIP_Metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Validate PBIP metadata (static integrity checks)
+        env:
+          PBIP_PROJECT_DIR: pbi-project
+        run: python scripts/pbip_metadata_validation.py
+
   Get_Latest_TabularEditor2_Download_Link:
     runs-on: ubuntu-latest
     outputs:
@@ -43,7 +61,7 @@ jobs:
         shell: bash
 
   BPA:
-    needs: Get_Latest_TabularEditor2_Download_Link
+    needs: [Validate_PBIP_Metadata, Get_Latest_TabularEditor2_Download_Link]
     runs-on: windows-latest
     steps:
       - name: Checkout repository
