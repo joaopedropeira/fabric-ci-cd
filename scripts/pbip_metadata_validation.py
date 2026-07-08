@@ -26,6 +26,30 @@ import sys
 PROJECT_DIR = os.environ.get("PBIP_PROJECT_DIR", "pbi-project")
 RESULTS_FILE = "pbip_validation_results.json"
 
+
+def _resolve_project_roots():
+    """Project roots to validate.
+
+    PBIP_PROJECT_DIRS (space/comma/newline separated) takes precedence and is
+    used by CI to validate ONLY the projects changed in a PR. Falls back to the
+    single PBIP_PROJECT_DIR (default 'pbi-project') for local runs.
+    An explicitly-set but empty PBIP_PROJECT_DIRS means 'no changed projects'.
+    """
+    raw = os.environ.get("PBIP_PROJECT_DIRS")
+    if raw is not None:
+        return [d for d in re.split(r"[\s,]+", raw.strip()) if d]
+    return [PROJECT_DIR]
+
+
+PROJECT_ROOTS = _resolve_project_roots()
+
+
+def walk_projects():
+    """os.walk over every selected project root."""
+    for root_dir in PROJECT_ROOTS:
+        for tup in os.walk(root_dir):
+            yield tup
+
 # Structured report: each entry describes one check.
 REPORT = []
 
@@ -64,7 +88,7 @@ def rel(path):
 def check_json_well_formed():
     bad = []
     found = False
-    for root, _dirs, files in os.walk(PROJECT_DIR):
+    for root, _dirs, files in walk_projects():
         for name in files:
             if name.lower().endswith(".json"):
                 found = True
@@ -92,7 +116,7 @@ def check_pbip_references():
     status = "pass"
 
     pbip_files = []
-    for root, _dirs, files in os.walk(PROJECT_DIR):
+    for root, _dirs, files in walk_projects():
         for name in files:
             if name.lower().endswith(".pbip"):
                 pbip_files.append(os.path.join(root, name))
@@ -120,7 +144,7 @@ def check_pbip_references():
                     details.append(f"{rel(pbip)} referencia pasta inexistente: '{path}'")
                     status = "fail"
 
-    for root, _dirs, files in os.walk(PROJECT_DIR):
+    for root, _dirs, files in walk_projects():
         for name in files:
             if name.lower().endswith(".pbir"):
                 p = os.path.join(root, name)
@@ -157,7 +181,7 @@ def check_pbip_references():
 def check_required_files():
     details = []
     status = "pass"
-    for root, dirs, _files in os.walk(PROJECT_DIR):
+    for root, dirs, _files in walk_projects():
         for d in dirs:
             full = os.path.join(root, d)
             if d.endswith(".Report"):
@@ -202,7 +226,7 @@ def check_required_files():
 def check_report_resources():
     details = []
     status = "pass"
-    for root, _dirs, files in os.walk(PROJECT_DIR):
+    for root, _dirs, files in walk_projects():
         if os.path.basename(root) == "definition" and "report.json" in files:
             report_json = os.path.join(root, "report.json")
             report_folder = os.path.dirname(root)
@@ -236,7 +260,8 @@ def check_gitignore_hygiene():
     details = []
     status = "pass"
 
-    gitignores = [g for g in (os.path.join(PROJECT_DIR, ".gitignore"), ".gitignore")
+    gitignores = [g for g in dict.fromkeys(
+                      [".gitignore"] + [os.path.join(r, ".gitignore") for r in PROJECT_ROOTS])
                   if os.path.isfile(g)]
     contents = ""
     for gi in gitignores:
@@ -303,15 +328,28 @@ def _finish(failed):
 
 
 def main():
-    print(f"PBIP Metadata Validation - project folder: '{PROJECT_DIR}'")
-    if not os.path.isdir(PROJECT_DIR):
-        print(f"::error::Project folder not found: {PROJECT_DIR}")
+    if not PROJECT_ROOTS:
+        print("PBIP Metadata Validation - nenhum projeto PBIP alterado; nada a validar.")
+        REPORT.append({
+            "title": "Projetos alterados",
+            "what": "Nenhum projeto PBIP foi alterado neste PR",
+            "why": "Sem alteracoes em projetos PBIP nao ha o que validar nesta etapa",
+            "status": "pass",
+            "details": [],
+        })
+        _finish(failed=False)
+        return
+
+    print(f"PBIP Metadata Validation - projetos: {', '.join(PROJECT_ROOTS)}")
+    missing = [r for r in PROJECT_ROOTS if not os.path.isdir(r)]
+    if missing:
+        print(f"::error::Project folder(s) not found: {', '.join(missing)}")
         REPORT.append({
             "title": "Pasta do projeto",
-            "what": f"A pasta '{PROJECT_DIR}' existe",
+            "what": "As pastas de projeto informadas existem",
             "why": "Sem a pasta do projeto nao ha o que validar",
             "status": "fail",
-            "details": [f"Pasta nao encontrada: {PROJECT_DIR}"],
+            "details": [f"Pasta nao encontrada: {m}" for m in missing],
         })
         _finish(failed=True)
         return
