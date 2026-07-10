@@ -10,3 +10,6 @@ nice_to_have.csv
 # Para acionar a esteira na frente do cliente, remova a linha abaixo e faca
 # `git add pbi-project3` + commit + push (o gate incremental valida so ele).
 pbi-project3/
+
+# Notebook exploratorio com credenciais hardcoded: NAO commitar.
+Teste_QA*.ipynb

@@ -12,17 +12,47 @@ name: Power BI Quality Gates
 # Report rules and BPA only run if metadata validation passes. Each gate posts
 # its own PR comment and status label.
 
+# ===========================================================================
+# ON — GATILHOS: quando este workflow roda.
+#   • workflow_dispatch  -> permite disparar manualmente (botão "Run workflow").
+#                           Nesse modo, valida TODOS os projetos PBIP do repo.
+#   • pull_request->main -> roda automaticamente a cada PR (aberto/atualizado)
+#                           que aponta para a branch `main`. Valida apenas os
+#                           projetos ALTERADOS no PR.
+#   Obs.: um simples `push` NAO dispara os gates — só PR para main (ou manual).
+# ===========================================================================
 on:
   workflow_dispatch:
   pull_request:
     branches:
       - main
 
+# ===========================================================================
+# PERMISSIONS — o que o GITHUB_TOKEN nativo pode fazer nesta execução.
+#   • contents: read       -> ler/fazer checkout do código do repositório.
+#   • pull-requests: write -> postar comentários e aplicar labels no PR.
+#   Princípio do menor privilégio: concede só o necessário para os gates.
+# ===========================================================================
 permissions:
   contents: read
   pull-requests: write
 
+# ===========================================================================
+# JOBS — as etapas do pipeline (cada uma roda num runner efêmero, descartado
+# ao final). Dependências entre jobs são declaradas com `needs`.
+# Fluxo geral:
+#   Discover_Projects
+#     ├─(paralelo) Validate_PBIP_Metadata
+#     └─(paralelo) Report_Rules_PBI_Inspector
+#           └─ Get_Latest_TabularEditor2_Download_Link ─► BPA
+# ===========================================================================
 jobs:
+  # -------------------------------------------------------------------------
+  # JOB 0 — Discover_Projects: decide QUAIS projetos PBIP validar.
+  # Faz o diff do PR contra a branch base e seleciona apenas os projetos
+  # alterados; publica a lista no output `projects`, consumido pelos gates.
+  # (Em run manual, seleciona todos os projetos.)
+  # -------------------------------------------------------------------------
   Discover_Projects:
     runs-on: ubuntu-latest
     outputs:
@@ -62,6 +92,13 @@ jobs:
           echo "projects=${SELECTED[*]:-}" >> "$GITHUB_OUTPUT"
           echo "count=${#SELECTED[@]}" >> "$GITHUB_OUTPUT"
 
+  # -------------------------------------------------------------------------
+  # JOB 1 (paralelo) — Validate_PBIP_Metadata: gate de INTEGRIDADE dos arquivos.
+  # Roda checagens estáticas (JSON válido, referências .pbip/.pbir resolvem,
+  # arquivos obrigatórios presentes, higiene do .gitignore, etc.) nos projetos
+  # alterados. Comenta o resultado no PR e FALHA se houver problema bloqueante.
+  # É o gate mais barato; os demais só seguem se ele passar.
+  # -------------------------------------------------------------------------
   Validate_PBIP_Metadata:
     needs: Discover_Projects
     runs-on: ubuntu-latest
@@ -77,18 +114,21 @@ jobs:
       - name: Install Python dependencies
         run: pip install requests
 
+      # Roda a validação estática; PBIP_PROJECT_DIRS = projetos alterados.
       - name: Validate PBIP metadata (static integrity checks, changed projects)
         env:
           # Space-separated list of changed projects (empty = nothing to validate).
           PBIP_PROJECT_DIRS: ${{ needs.Discover_Projects.outputs.projects }}
         run: python scripts/metadata_validation/pbip_metadata_validation.py
 
+      # Guarda o JSON de resultado como artifact (download na aba Actions).
       - name: Upload metadata validation result
         uses: actions/upload-artifact@v4
         with:
           name: PBIP-Metadata-Validation-Result
           path: pbip_validation_results.json
 
+      # Só em PR: publica o resultado como comentário + label `metadata-*`.
       - name: Comment on Pull Request
         if: github.event_name == 'pull_request'
         env:
@@ -97,6 +137,8 @@ jobs:
           REPO: ${{ github.repository }}
         run: python scripts/metadata_validation/pbip_pr_comment.py
 
+      # Falha o job (bloqueia) se a validação marcou erro. Roda DEPOIS do
+      # comentário para o feedback aparecer no PR mesmo quando reprova.
       - name: Fail if metadata validation failed
         if: env.METADATA_VALIDATION_FAILED == 'true'
         run: |
@@ -104,6 +146,13 @@ jobs:
           exit 1
         shell: bash
 
+  # -------------------------------------------------------------------------
+  # JOB 1 (paralelo) — Report_Rules_PBI_Inspector: gate de BOAS PRÁTICAS do
+  # RELATÓRIO (VisOps). Usa a CLI do Fab Inspector (PBI Inspector V2) em modo
+  # LOCAL — lê os arquivos do .Report do checkout, sem Fabric e sem auth — e
+  # valida os visuais/páginas dos relatórios alterados. Comenta no PR e falha
+  # se houver violação. Roda em paralelo com o metadata (olham partes diferentes).
+  # -------------------------------------------------------------------------
   Report_Rules_PBI_Inspector:
     needs: Discover_Projects
     runs-on: ubuntu-latest
@@ -176,12 +225,14 @@ jobs:
           echo "REPORT_RULES_FAILED=$FAILED" >> $GITHUB_ENV
           exit 0
 
+      # Guarda a saída do console do Fab Inspector como artifact.
       - name: Upload Fab Inspector console output
         uses: actions/upload-artifact@v4
         with:
           name: Fab-Inspector-Report-Rules-Result
           path: fabinspector_console.txt
 
+      # Só em PR: publica o resultado como comentário + label `reportrules-*`.
       - name: Comment on Pull Request
         if: github.event_name == 'pull_request'
         env:
@@ -190,6 +241,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: python scripts/fab_validator/fabinspector_pr_comment.py
 
+      # Falha o job se o Fab Inspector encontrou violações (após comentar).
       - name: Fail if report rules failed
         if: env.REPORT_RULES_FAILED == 'true'
         run: |
@@ -197,6 +249,11 @@ jobs:
           exit 1
         shell: bash
 
+  # -------------------------------------------------------------------------
+  # JOB 2 — Get_Latest_TabularEditor2_Download_Link: descobre a URL da última
+  # versão do Tabular Editor 2 (via API) e a expõe como output para o job BPA.
+  # `needs` os dois gates estáticos: só roda se metadata E report rules passarem.
+  # -------------------------------------------------------------------------
   Get_Latest_TabularEditor2_Download_Link:
     needs: [Validate_PBIP_Metadata, Report_Rules_PBI_Inspector]
     runs-on: ubuntu-latest
@@ -206,6 +263,8 @@ jobs:
       - name: Get latest Tabular Editor 2 release using GitHub API
         id: get_url
         run: |
+          # Consulta a release mais recente do TE2, monta a URL do .zip do CDN
+          # e valida que responde 200 antes de expor a URL como output.
           release_info=$(curl -s https://api.github.com/repos/TabularEditor/TabularEditor/releases/latest)
           version=$(echo "$release_info" | jq -r '.tag_name' | sed 's/^v//')
           if [[ $version =~ ^[0-9]+\.[0-9]+$ ]]; then
@@ -220,6 +279,13 @@ jobs:
           echo "DOWNLOAD_URL=$download_url" >> $GITHUB_OUTPUT
         shell: bash
 
+  # -------------------------------------------------------------------------
+  # JOB 3 — BPA: gate de BOAS PRÁTICAS do MODELO semântico (Best Practice
+  # Analyzer). Roda em Windows, baixa o Tabular Editor 2, executa a macro do
+  # BPA em cada modelo alterado, classifica as violações por severidade,
+  # comenta no PR e FALHA o build se houver Severity 3 (Must Correct).
+  # `needs` Get_Latest (URL do TE2) + Discover_Projects (lista de projetos).
+  # -------------------------------------------------------------------------
   BPA:
     needs: [Get_Latest_TabularEditor2_Download_Link, Discover_Projects]
     runs-on: windows-latest
@@ -227,6 +293,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Baixa e descompacta o Tabular Editor 2 (usando a URL do job anterior).
       - name: Install Tabular Editor 2
         run: |
           curl -L ${{ needs.Get_Latest_TabularEditor2_Download_Link.outputs.download_url }} -o TabularEditor.zip
@@ -234,6 +301,7 @@ jobs:
           unzip TabularEditor.zip -d TabularEditor
         shell: bash
 
+      # Monta um prefixo (data-hora + repo + branch) para nomear os artifacts.
       - name: Set artifact prefix (CET timezone)
         run: |
           export TZ="Europe/Budapest"
@@ -287,9 +355,12 @@ jobs:
       - name: Install Python dependencies
         run: pip install pandas requests tabulate
 
+      # Cruza o CSV com o BPA_Rules.json (CustomSeverity), separa por severidade
+      # e seta SEVERITY_3_FOUND (que decide se o gate reprova).
       - name: Run BPA result analysis
         run: python scripts/bpa/bpa_result_analysis.py
 
+      # Sobe os CSVs classificados (must_correct/correct_asap/nice_to_have).
       - name: Upload Python artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -299,6 +370,7 @@ jobs:
             correct_asap.csv
             nice_to_have.csv
 
+      # Só em PR: publica o comentário do BPA + label `bpa-*`.
       - name: Comment on Pull Request
         if: github.event_name == 'pull_request'
         env:
@@ -307,6 +379,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: python scripts/bpa/pr_comment.py
 
+      # Falha o build se houver violação Severity 3 (Must Correct) — após comentar.
       - name: Fail if Severity 3 issues found
         if: env.SEVERITY_3_FOUND == 'true'
         run: |
