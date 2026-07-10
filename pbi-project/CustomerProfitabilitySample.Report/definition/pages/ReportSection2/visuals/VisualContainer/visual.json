@@ -18,12 +18,10 @@
               {
                 "textRuns": [
                   {
-                    "value": "Team Scorecard",
+                    "value": "Team Scorecard:",
                     "textStyle": {
-                      "fontFamily": "Heading",
-                      "fontSize": "28pt",
-                      "fontStyle": "normal",
-                      "fontWeight": "normal"
+                      "fontFamily": "Segoe UI Light",
+                      "fontSize": "28pt"
                     }
                   }
                 ],
