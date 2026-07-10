@@ -62,3 +62,4 @@ table Sales
 				    #"Changed Type" = Table.TransformColumnTypes(Source, {{"Product", type text}, {"Region", type text}, {"Units", Int64.Type}, {"Revenue", Int64.Type}})
 				in
 				    #"Changed Type"
+

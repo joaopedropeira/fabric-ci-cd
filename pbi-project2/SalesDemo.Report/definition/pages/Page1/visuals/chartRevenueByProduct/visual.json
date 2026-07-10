@@ -25,7 +25,8 @@
                   "Property": "Product"
                 }
               },
-              "queryRef": "Sales.Product"
+              "queryRef": "Sales.Product",
+              "active": true
             }
           ]
         },

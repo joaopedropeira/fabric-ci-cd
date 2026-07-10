@@ -11,3 +11,4 @@ annotation PBI_QueryOrder = ["Sales"]
 annotation PBI_ProTooling = ["DevMode"]
 
 ref table Sales
+
