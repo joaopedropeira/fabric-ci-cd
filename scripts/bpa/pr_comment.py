@@ -42,15 +42,15 @@ def format_violations(df, expanded=True):
         output.append(
             f"<details{' open' if expanded else ''}>\n"
             f"<summary><h4>🔎 {rule} – "
-            f"<a href='{rule_link}' target='_blank'>Rule Description 🔗</a></h4></summary>\n"
+            f"<a href='{rule_link}' target='_blank'>Descrição da regra 🔗</a></h4></summary>\n"
         )
 
         formatted_objects = [f"**{obj}** ({typ})" for obj, typ in objects]
         if len(formatted_objects) > 10:
             columns = [formatted_objects[i::3] for i in range(3)]
             max_len = max(len(col) for col in columns)
-            output.append("\n| List of Issues | List of Issues | List of Issues |")
-            output.append("|:---------------|:---------------|:---------------|")
+            output.append("\n| Lista de ocorrências | Lista de ocorrências | Lista de ocorrências |")
+            output.append("|:---------------------|:---------------------|:---------------------|")
             for i in range(max_len):
                 row = [columns[col][i] if i < len(columns[col]) else "" for col in range(3)]
                 output.append("| " + " | ".join(row) + " |")
@@ -67,55 +67,55 @@ def build_rule_summary(df):
     rule_counts = df['RuleName'].value_counts().reset_index()
     rule_counts.columns = ['RuleName', 'Violations']
     rule_counts = rule_counts.sort_values('Violations', ascending=False)
-    table = "| RuleName | Violations |\n|:---------|-----------:|\n"
+    table = "| Regra | Ocorrências |\n|:------|-----------:|\n"
     table += "\n".join([f"| {row['RuleName']} | {row['Violations']} |" for _, row in rule_counts.iterrows()])
     return table
 
 def generate_message(include_sev3=True, include_sev2=True, include_sev1=True, summary_only_sev1=False, summary_only_sev2=False):
     message = result_message + artifact_section + summary_table
     if include_sev3:
-        message += f"\n\n## 🚨 Must Correct (Severity 3)\n\n{build_rule_summary(must_correct)}\n\n{format_violations(must_correct)}"
+        message += f"\n\n## 🚨 Corrigir obrigatoriamente (Severidade 3)\n\n{build_rule_summary(must_correct)}\n\n{format_violations(must_correct)}"
     if include_sev2:
-        message += "\n\n## ⚡ Correct ASAP (Severity 2)\n\n"
+        message += "\n\n## ⚡ Corrigir o quanto antes (Severidade 2)\n\n"
         message += build_rule_summary(correct_asap)
         if not summary_only_sev2:
             message += f"\n\n{format_violations(correct_asap)}"
         else:
-            message += "\n\nToo many issues to display. Please check the artifacts for full results.\n"
+            message += "\n\nProblemas demais para exibir. Consulte os artefatos para o resultado completo.\n"
     if include_sev1:
-        message += "\n\n## 💡 Nice to Have (Severity 1)\n\n"
+        message += "\n\n## 💡 Bom ter (Severidade 1)\n\n"
         message += build_rule_summary(nice_to_have)
         if not summary_only_sev1:
-            message += f"\n\n<details><summary><strong>Click to check details</strong></summary>\n\n{format_violations(nice_to_have)}\n</details>"
+            message += f"\n\n<details><summary><strong>Clique para ver os detalhes</strong></summary>\n\n{format_violations(nice_to_have)}\n</details>"
         else:
-            message += "\n\nToo many issues to display. Please check the artifacts for full results.\n"
+            message += "\n\nProblemas demais para exibir. Consulte os artefatos para o resultado completo.\n"
     return message
 
 # --- Result Status ---
 if must_correct.empty:
     if correct_asap.empty:
         result_message = (
-            "# ✅ Model can be deployed. No Severity 3 (critical) or Severity 2 issues found.\n\n"
-            "### 💡 You can still improve model quality by addressing Severity 1 issues (if any)."
+            "# ✅ O modelo pode ser publicado. Nenhum problema de Severidade 3 (crítica) ou Severidade 2 encontrado.\n\n"
+            "### 💡 Você ainda pode melhorar a qualidade do modelo tratando os problemas de Severidade 1 (se houver)."
         )
     else:
         result_message = (
-            "# ✅ Model can be deployed. No Severity 3 (critical) issues found.\n\n"
-            "### ⚡ You should still fix Severity 2 issues ASAP to improve model quality!"
+            "# ✅ O modelo pode ser publicado. Nenhum problema de Severidade 3 (crítica) encontrado.\n\n"
+            "### ⚡ Ainda assim, corrija os problemas de Severidade 2 o quanto antes para melhorar a qualidade do modelo!"
         )
 else:
-    result_message = "# ❌ Model cannot be deployed until Severity 3 issues are fixed."
+    result_message = "# ❌ O modelo não pode ser publicado enquanto os problemas de Severidade 3 não forem corrigidos."
 
 artifact_link = f"https://github.com/{REPO}/actions/runs/{RUN_ID}"
-artifact_section = f"\n\n📂 **BPA Result & Result analysis (CSV downloads):** [View .zip files Here]({artifact_link})\n"
+artifact_section = f"\n\n📂 **Resultado do BPA e análise (downloads em CSV):** [Ver arquivos .zip aqui]({artifact_link})\n"
 
-summary_table = f"""### 📊 Summary
+summary_table = f"""### 📊 Resumo
 
-| Severity Level | Number of Issues |
-|:---------------|-----------------:|
-| 🚨 Must Correct | {len(must_correct)} |
-| ⚡ Correct ASAP | {len(correct_asap)} |
-| 💡 Nice to Have | {len(nice_to_have)} |
+| Nível de Severidade | Nº de Problemas |
+|:--------------------|----------------:|
+| 🚨 Corrigir obrigatoriamente | {len(must_correct)} |
+| ⚡ Corrigir o quanto antes | {len(correct_asap)} |
+| 💡 Bom ter | {len(nice_to_have)} |
 """
 
 # --- Generate the PR body with fallback truncation ---

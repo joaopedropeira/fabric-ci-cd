@@ -3,14 +3,33 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Power BI → GitHub → Fabric · Esteira de CI/CD com Quality Gates</title>
+  <title>Power BI → Fabric · CI/CD com Quality Gates</title>
   <meta name="description" content="Demo/PoC de uma esteira de CI/CD de Power BI até o Microsoft Fabric, com duas etapas de validação: estática (GitHub) e dinâmica (Fabric)." />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <meta name="theme-color" content="#7c5cff" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
+  <!-- ===== DARK/LIGHT MODE TOGGLE (remover este bloco para rollback) ===== -->
+  <button id="themeToggle" class="theme-toggle" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">
+    <svg class="theme-toggle__moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" fill="currentColor"/></svg>
+    <svg class="theme-toggle__sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.9" y1="4.9" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.1" y2="19.1"/><line x1="4.9" y1="19.1" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.1" y2="4.9"/></g></svg>
+  </button>
+  <!-- ===== /DARK/LIGHT MODE TOGGLE ===== -->
+
+  <!-- ===== LANGUAGE TOGGLE (remover este bloco para rollback) ===== -->
+  <button id="langToggle" class="lang-toggle" aria-label="Switch language" title="PT-BR / EN-US">
+    <svg class="lang-toggle__globe" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <path d="M3 12h18M12 3c2.6 2.6 2.6 15.4 0 18M12 3c-2.6 2.6-2.6 15.4 0 18M5 6.5c4 2 10 2 14 0M5 17.5c4-2 10-2 14 0" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    </svg>
+    <span id="langLabel" class="lang-toggle__badge">PT</span>
+  </button>
+  <!-- ===== /LANGUAGE TOGGLE ===== -->
+
   <!-- SVG sprite: ícones (stroke) usados no menu e nos nós -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
@@ -34,6 +53,7 @@
       <symbol id="i-rocket" viewBox="0 0 24 24"><path d="M5 15c-1 2-1 4-1 4s2 0 4-1M14 4c3 1 5 4 5 8 0 2-1 3-2 4l-4 2-4-4 2-4c1-1 2-2 4-2 1.5 0 2.5.5 2.5.5M9 11 6 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-notebook" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H7zM7 4v16M10 9h5M10 13h5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
       <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></symbol>
       <symbol id="i-puzzle" viewBox="0 0 24 24"><path d="M10.5 4a1.5 1.5 0 0 1 3 0V5H16a1 1 0 0 1 1 1v2.5h1a1.5 1.5 0 0 1 0 3h-1V14a1 1 0 0 1-1 1h-2.5v1a1.5 1.5 0 0 1-3 0v-1H8a1 1 0 0 1-1-1v-2.5H6a1.5 1.5 0 0 1 0-3h1V6a1 1 0 0 1 1-1h2.5V4Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
       <symbol id="i-approve" viewBox="0 0 24 24"><path d="M3 12l3 3 5-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 9l5 5M20 9l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     </defs>
@@ -55,14 +75,13 @@
       <span class="side-nav__logo">◆</span>
     </a>
     <ul class="side-nav__list" id="navList">
-      <li><a href="#hero" class="nav-item" data-label="Início"><span class="nav-node"></span><svg class="nav-ico"><use href="#i-home"/></svg></a></li>
-      <li><a href="#problema" class="nav-item" data-label="O Problema"><span class="nav-node"></span><svg class="nav-ico"><use href="#i-alert"/></svg></a></li>
-      <li><a href="#arquitetura" class="nav-item" data-label="Arquitetura"><span class="nav-node"></span><svg class="nav-ico"><use href="#i-arch"/></svg></a></li>
-      <li><a href="#etapas" class="nav-item" data-label="2 Etapas"><span class="nav-node"></span><svg class="nav-ico"><use href="#i-steps"/></svg></a></li>
-      <li><a href="#incremental" class="nav-item" data-label="Incremental"><span class="nav-node"></span><svg class="nav-ico"><use href="#i-branch"/></svg></a></li>
-      <li><a href="#severidades" class="nav-item" data-label="Severidades"><span class="nav-node"></span><svg class="nav-ico"><use href="#i-gauge"/></svg></a></li>
-      <li><a href="#fabric" class="nav-item" data-label="Fabric"><span class="nav-node"></span><img class="nav-ico nav-ico--fab" src="images/fabric_20_regular_no_color.png" alt="Fabric" /></a></li>
-      <li><a href="#roadmap" class="nav-item" data-label="Roadmap"><span class="nav-node"></span><svg class="nav-ico"><use href="#i-flag"/></svg></a></li>
+      <li><a href="#hero" class="nav-item" data-label="Início" data-label-en="Home"><span class="nav-node"></span><svg class="nav-ico"><use href="#i-home"/></svg></a></li>
+      <li><a href="#problema" class="nav-item" data-label="O Problema" data-label-en="The Problem"><span class="nav-node"></span><svg class="nav-ico"><use href="#i-alert"/></svg></a></li>
+      <li><a href="#etapas" class="nav-item" data-label="2 Etapas" data-label-en="2 Stages"><span class="nav-node"></span><svg class="nav-ico"><use href="#i-steps"/></svg></a></li>
+      <li><a href="#arquitetura" class="nav-item" data-label="Arquitetura" data-label-en="Architecture"><span class="nav-node"></span><svg class="nav-ico"><use href="#i-arch"/></svg></a></li>
+      <li><a href="#incremental" class="nav-item" data-label="Incremental" data-label-en="Incremental"><span class="nav-node"></span><svg class="nav-ico"><use href="#i-branch"/></svg></a></li>
+      <li><a href="#severidades" class="nav-item" data-label="Severidades" data-label-en="Severity"><span class="nav-node"></span><svg class="nav-ico"><use href="#i-gauge"/></svg></a></li>
+      <li><a href="#fabric" class="nav-item" data-label="Fabric" data-label-en="Fabric"><span class="nav-node"></span><img class="nav-ico nav-ico--fab" src="images/fabric_20_regular_no_color.png" alt="Fabric" /></a></li>
     </ul>
     <a class="side-nav__foot" href="https://github.com/joaopedropeira/fabric-ci-cd" target="_blank" rel="noopener" aria-label="Repositório no GitHub">
       <svg class="nav-ico"><use href="#i-github"/></svg>
@@ -73,72 +92,170 @@
     <!-- HERO -->
     <section id="hero" class="section section--hero" data-theme="violet">
       <div class="hero__inner">
-        <p class="eyebrow reveal">Demo · PoC · Pipeline-as-Code</p>
-        <h1 class="hero__title reveal">
-          CI/CD para Power BI &amp; Microsoft Fabric<br />
-          com <span class="hero__accent">quality gates</span> automáticos.
+        <p class="eyebrow reveal" data-en="Standardization · Quality · Versioning · Pipeline-as-Code">Padronização · Qualidade · Versionamento · Pipeline-as-Code</p>
+        <h1 class="hero__title reveal" data-en='Version, standardize and certify your Power BI<br />at enterprise scale, with <span class="hero__accent">quality gates</span>.'>
+          Versione, padronize e certifique seu Power BI<br />
+          em escala enterprise, com <span class="hero__accent">quality gates</span>.
         </h1>
-        <p class="hero__lead reveal">
-          Uma esteira de <strong>CI/CD</strong> que valida seus projetos Power BI em
-          <strong>duas etapas</strong>: estática no <strong>GitHub</strong> e dinâmica no
-          <strong>Fabric</strong>, levando o artefato até produção com governança de ponta a ponta.
+        <p class="hero__lead reveal" data-en='Add <strong>CI/CD and versioning</strong> to how you build your Power BI items, with <em>quality</em> and <em>performance</em> checks <span class="hero__accent">before and after</span> every publish. Enable <strong>collaboration and best practices</strong> tailored to your company, all <em>automatically</em>.'>
+          Adicione <strong>CI/CD e versionamento</strong> ao seu processo de criação de itens de Power BI,
+          com validação de <em>qualidade</em> e <em>performance</em> <span class="hero__accent">antes e após</span> cada publicação. Habilite
+          <strong>colaboração e boas práticas</strong> customizadas para a sua empresa,
+          tudo de forma <em>automática</em>.
         </p>
-        <div class="hero__cta reveal">
-          <a href="#arquitetura" class="btn btn--primary">Ver a arquitetura</a>
-          <a href="#etapas" class="btn btn--ghost">As 2 etapas</a>
+        <div class="hero__quicklook reveal">
+          <h2 class="hero__quicklook-title" data-en="See how it works">Veja como funciona</h2>
+          <div class="ql-tabs" role="tablist" aria-label="Quick Look">
+            <button class="ql-tab is-active" data-tab="video" role="tab" aria-selected="true" data-en="Video">Vídeo</button>
+            <button class="ql-tab" data-tab="arch" role="tab" aria-selected="false" data-en="Architecture">Arquitetura</button>
+          </div>
+          <div class="ql-panels">
+            <div class="ql-panel is-active" data-panel="video">
+              <div class="video-frame">
+                <!-- Quando o video existir, troque o bloco abaixo por:
+                     <video controls poster="images/video-poster.png" src="assets/demo.mp4"></video> -->
+                <button class="video-play" aria-label="Reproduzir video"><svg class="ico"><use href="#i-play"/></svg></button>
+                <span class="video-soon" data-en="VIDEO COMING SOON">VÍDEO EM BREVE</span>
+              </div>
+            </div>
+            <div class="ql-panel" data-panel="arch">
+              <div class="video-frame video-frame--img">
+                <img src="images/CD.trimmed.png" alt="Arquitetura da esteira de CI/CD" />
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="hero__pipe reveal">
-          <div class="pipe-node"><span class="pipe-ico"><img class="brandimg" src="images/power_bi_16_color.png" alt="Power BI" /></span><b>Power BI Desktop</b></div>
-          <div class="pipe-wire"><i></i></div>
-          <div class="pipe-node"><span class="pipe-ico"><svg class="ico"><use href="#i-github"/></svg></span><b>GitHub (CI/CD)</b></div>
-          <div class="pipe-wire"><i></i></div>
-          <div class="pipe-node"><span class="pipe-ico"><svg class="ico"><use href="#i-shield"/></svg></span><b>Qualidade</b></div>
-          <div class="pipe-wire"><i></i></div>
-          <div class="pipe-node"><span class="pipe-ico"><img class="brandimg" src="images/fabric_24_color.png" alt="Fabric" /></span><b>Fabric</b></div>
-          <div class="pipe-wire"><i></i></div>
-          <div class="pipe-node"><span class="pipe-ico"><svg class="ico"><use href="#i-gauge"/></svg></span><b>Performance</b></div>
-          <div class="pipe-wire"><i></i></div>
-          <div class="pipe-node"><span class="pipe-ico"><svg class="ico"><use href="#i-eye"/></svg></span><b>Visualização / Consumo</b></div>
+        <p class="flow-heading reveal" data-en="Simplified pipeline flow">Fluxo simplificado da esteira</p>
+        <div class="hero__flow reveal">
+          <div class="flow-zone">
+            <span class="flow-zone__label" data-en="Static Validation · GitHub">Validação Estática · GitHub</span>
+            <div class="flow-zone__nodes">
+              <div class="pipe-node"><span class="pipe-ico"><img class="brandimg" src="images/power_bi_16_color.png" alt="Power BI" /></span><b>Power BI Desktop</b><small data-en="local dev">dev local</small></div>
+              <div class="pipe-wire" style="--d:0s"><small>commit</small><i></i></div>
+              <div class="pipe-node"><span class="pipe-ico"><svg class="ico"><use href="#i-branch"/></svg></span><b>GitHub</b><small data-en="dev branch">branch dev</small></div>
+              <div class="pipe-wire" style="--d:1.2s"><small>PR / merge</small><i></i></div>
+              <div class="pipe-node"><span class="pipe-ico"><svg class="ico"><use href="#i-github"/></svg></span><b>GitHub</b><small data-en="main · repository">main · repositório</small></div>
+            </div>
+          </div>
+
+          <div class="flow-zone flow-zone--bridge">
+            <span class="flow-cut" aria-hidden="true"></span>
+            <div class="flow-zone__nodes">
+              <div class="pipe-wire flow-bridge" style="--d:2.4s"><small>deploy</small><i></i></div>
+            </div>
+          </div>
+
+          <div class="flow-zone">
+            <span class="flow-zone__label" data-en="Dynamic Validation · Fabric">Validação Dinâmica · Fabric</span>
+            <div class="flow-zone__nodes">
+              <div class="pipe-node"><span class="pipe-ico"><img class="brandimg" src="images/fabric_24_color.png" alt="Fabric" /></span><b>Fabric</b><small data-en="Dev workspace">workspace Dev</small></div>
+              <div class="pipe-wire" style="--d:3.6s"><small>refresh</small><i></i></div>
+              <div class="pipe-node"><span class="pipe-ico"><svg class="ico"><use href="#i-notebook"/></svg></span><b data-en="Validation">Validação</b><small data-en="Fabric notebook">notebook Fabric</small></div>
+              <div class="pipe-wire" style="--d:4.8s"><small data-en="approved">aprovado</small><i></i></div>
+              <div class="pipe-node"><span class="pipe-ico"><img class="brandimg" src="images/fabric_24_color.png" alt="Fabric" /></span><b>Fabric</b><small data-en="PRD workspace">workspace PRD</small></div>
+              <div class="pipe-wire" style="--d:6s"><small data-en="consumes">consome</small><i></i></div>
+              <div class="pipe-node"><span class="pipe-ico"><svg class="ico"><use href="#i-eye"/></svg></span><b data-en="Consumption">Consumo</b><small>Power BI App</small></div>
+            </div>
+          </div>
         </div>
 
         <div class="hero__stats reveal">
-          <div class="stat"><b data-count="2">0</b><span>etapas de validação</span></div>
-          <div class="stat"><b data-count="3">0</b><span>gates estáticos</span></div>
-          <div class="stat"><b data-count="75">0</b><span>regras de BPA</span></div>
-          <div class="stat"><b data-count="100">0</b><span>% pipeline as code</span></div>
+          <div class="stat"><span class="stat-value"><b data-count="2">0</b></span><span data-en='<strong>validation moments</strong>: static (best practices and company standards) and dynamic (performance, usability and scalability)'><strong>momentos de validação</strong>: estática (boas práticas e padrões da empresa) e dinâmica (performance, usabilidade e escalabilidade)</span></div>
+          <div class="stat"><span class="stat-value"><b>∞</b></span><span data-en='<strong>tailored quality gates</strong>: the amount and the rules of each moment are defined by your company and its needs'><strong>gates de qualidade sob medida</strong>: a quantidade e as regras de cada momento são definidas pela sua empresa e necessidade</span></div>
+          <div class="stat"><span class="stat-value"><b data-count="75">0</b><em>+</em></span><span data-en='ready-made <a href="https://github.com/microsoft/Analysis-Services/blob/master/BestPracticeRules/BPARules.json" target="_blank" rel="noopener" class="stat-link">BPA</a> rules + your own custom ones'>regras de <a href="https://github.com/microsoft/Analysis-Services/blob/master/BestPracticeRules/BPARules.json" target="_blank" rel="noopener" class="stat-link">BPA</a> prontas + as suas próprias customizadas</span></div>
+          <div class="stat"><span class="stat-value"><b data-count="100">0</b><em>%</em></span><span data-en='<strong>pipeline as code</strong>: versioned in Git and automated, from commit to production'><strong>pipeline as code</strong>: versionado no Git e automatizado, do commit à produção</span></div>
+        </div>
+
+        <div class="hero__cta reveal">
+          <a href="#etapas" class="btn btn--gradient-border" data-en="The 2 stages">As 2 etapas</a>
+          <a href="#arquitetura" class="btn btn--primary" data-en="See simplified architecture">Ver arquitetura simplificada</a>
         </div>
       </div>
-      <a href="#problema" class="scroll-hint" aria-label="Rolar para baixo"><span></span>role para explorar</a>
+      <a href="#problema" class="scroll-hint" aria-label="Rolar para baixo" data-en='<span></span>scroll to explore'><span></span>role para explorar</a>
     </section>
 
     <!-- PROBLEMA -->
     <section id="problema" class="section" data-theme="rose">
       <div class="container">
-        <span class="section__tag reveal">01 · Por quê</span>
-        <h2 class="section__title reveal">Sem esteira, cada publicação é um risco.</h2>
-        <p class="section__sub reveal">
+        <span class="section__tag reveal" data-en="01 · Why">01 · Por quê</span>
+        <h2 class="section__title reveal" data-en="Without a pipeline, every publish is a risk.">Sem esteira, cada publicação é um risco.</h2>
+        <p class="section__sub reveal" data-en='Without automation, modeling, report and reuse issues only show up late, often in production. This solution tackles that late feedback: <strong>before</strong> publishing, content goes through quality and standardization checks; <strong>after</strong> publishing, quality and performance validations run against real data.'>
           Sem automação, problemas de modelagem, de relatório e de reuso só aparecem tarde,
-          muitas vezes em produção. Esta esteira move a qualidade para a <strong>esquerda</strong>,
-          direto no Pull Request.
+          muitas vezes em produção. Esta solução ataca esse problema tardio: <strong>antes</strong> mesmo de
+          publicar, o conteúdo passa por controles de qualidade e padronização; <strong>depois</strong> da
+          publicação, entram as validações de qualidade e performance com dados reais.
         </p>
         <div class="cards cards--4">
-          <article class="card reveal"><div class="card__ico"><svg class="ico"><use href="#i-puzzle"/></svg></div><h3>Sem padronização</h3><p>Cada dev publica do seu jeito; boas práticas de modelo e relatório ficam a critério individual.</p></article>
-          <article class="card reveal"><div class="card__ico"><svg class="ico"><use href="#i-alert"/></svg></div><h3>Erro tardio</h3><p>Problemas de DAX, colunas mal configuradas e visuais fora do padrão só são pegos tarde demais.</p></article>
-          <article class="card reveal"><div class="card__ico"><svg class="ico"><use href="#i-branch"/></svg></div><h3>Sem colaboração &amp; reuso</h3><p>Modelos e datasets duplicados por falta de reaproveitamento: mais conexões no gateway, mais custo e retrabalho.</p></article>
-          <article class="card reveal"><div class="card__ico"><svg class="ico"><use href="#i-shield"/></svg></div><h3>Deploy sem trava</h3><p>Nada impede subir um modelo problemático. Falta um <em>gate</em> que bloqueie o que não deve passar.</p></article>
+          <article class="card reveal"><div class="card__ico"><svg class="ico"><use href="#i-puzzle"/></svg></div><h3 data-en="No standardization">Sem padronização</h3><p data-en='Without a common standard, everyone models, names and organizes their own way. The result is <strong>inconsistent reports</strong>, hard to maintain and to understand for anyone who did not build them.<br /><em>Best practices become optional, not the rule.</em>'>Sem um padrão comum, cada pessoa modela, nomeia e organiza do seu jeito. O resultado são <strong>relatórios inconsistentes</strong>, difíceis de manter e de entender por quem não os criou.<br /><em>Boas práticas viram opcionais, não regra.</em></p></article>
+          <article class="card reveal"><div class="card__ico"><svg class="ico"><use href="#i-shield"/></svg></div><h3 data-en="Ungated deploy">Deploy sem trava</h3><p data-en='Nothing stops a <strong>problematic model</strong> from going up, which often ends up impacting <strong>your capacity as a whole</strong>, affecting other important reports and dashboards.<br /><em>A gate to block what should not pass is missing.</em>'>Nada impede subir um <strong>modelo problemático</strong>, que muitas vezes acaba impactando <strong>sua capacidade como um todo</strong>, afetando outros relatórios e dashboards importantes.<br /><em>Falta um gate que bloqueie o que não deve passar.</em></p></article>
+          <article class="card reveal"><div class="card__ico"><svg class="ico"><use href="#i-branch"/></svg></div><h3 data-en="No collaboration &amp; reuse">Sem colaboração &amp; reuso</h3><p data-en='Without versioning and teamwork, models and datasets end up <strong>duplicated</strong> and disconnected. That multiplies gateway connections, <strong>increases cost</strong> and creates constant rework.<br /><em>What already exists is rarely reused.</em>'>Sem versionamento e trabalho em equipe, modelos e datasets acabam <strong>duplicados</strong> e desconectados. Isso multiplica conexões no gateway, <strong>aumenta o custo</strong> e gera retrabalho constante.<br /><em>O que já existe raramente é reaproveitado.</em></p></article>
+          <article class="card reveal"><div class="card__ico"><svg class="ico"><use href="#i-alert"/></svg></div><h3 data-en="Late errors">Erro tardio</h3><p data-en='DAX errors, misconfigured columns and off-standard visuals go unnoticed until they reach the <strong>end user</strong>. The later the problem shows up, the <strong>more expensive</strong> it is to fix.<br /><em>Without early validation, production becomes the test environment.</em>'>Erros de DAX, colunas mal configuradas e visuais fora do padrão passam despercebidos até chegarem ao <strong>usuário final</strong>. Quanto mais tarde o problema aparece, <strong>mais caro</strong> fica corrigir.<br /><em>Sem validação antecipada, a produção vira o ambiente de testes.</em></p></article>
         </div>
       </div>
+      <a href="#etapas" class="scroll-hint scroll-hint--section" aria-label="Continuar" data-en='<span></span>keep scrolling to explore'><span></span>continue rolando para explorar</a>
+    </section>
+
+    <!-- ETAPAS -->
+    <section id="etapas" class="section" data-theme="emerald">
+      <div class="container">
+        <span class="section__tag reveal" data-en="02 · Validation model">02 · Modelo de validação</span>
+        <h2 class="section__title reveal" data-en='It is <span class="hl">two stages</span> that complete each other.'>São <span class="hl">duas etapas</span> que se completam.</h2>
+        <p class="section__sub reveal" data-en='Validation happens at two moments with different goals. The <strong>static stage</strong> runs on GitHub via <strong>GitHub Actions</strong>, before merging into the main branch; the <strong>dynamic stage</strong> runs on Fabric, with real data, simulating concurrent access, performance, memory usage and more. Everything is defined in <strong>YAML</strong>: rules, gates and severities are fully configurable to your <strong>company needs</strong>.'>
+          A validação acontece em dois momentos com objetivos diferentes. A <strong>etapa estática</strong>
+          roda no GitHub via <strong>GitHub Actions</strong>, antes do merge com a branch principal; a
+          <strong>etapa dinâmica</strong> roda no Fabric, com dados reais, simulando acessos simultâneos,
+          performance, uso de memória etc. Tudo é definido em <strong>YAML</strong>: regras, gates e severidades
+          são totalmente configuráveis conforme a <strong>necessidade da sua empresa</strong>.
+        </p>
+
+        <div class="stages">
+          <article class="stage stage--1 reveal">
+            <div class="stage__num">01</div>
+            <div class="stage__ico"><svg class="ico"><use href="#i-shield"/></svg></div>
+            <h3 data-en="Static · on GitHub">Estática · no GitHub</h3>
+            <p class="stage__where" data-en="Runs on the Pull Request via GitHub Actions · ephemeral runners · no Fabric">Roda no Pull Request via GitHub Actions · runners efêmeros · sem Fabric</p>
+            <p class="stage__ex" data-en='<strong>Examples of ready-made validations</strong> <span>(customizable: add or remove as needed)</span>'><strong>Exemplo de validações já construídas</strong> <span>(customizáveis: adicione ou remova conforme a necessidade)</span></p>
+            <ul>
+              <li data-en='<b>Metadata</b>: integrity and structure of the PBIP project (files, folders and definitions in the right place)'><b>Metadata</b>: integridade e estrutura do projeto PBIP (arquivos, pastas e definições no lugar certo)</li>
+              <li data-en='<b>Report Rules</b>: report best practices via fabric-inspector, such as standardized layout, accessibility, interactions and hidden fields'><b>Report Rules</b>: boas práticas do relatório via fabric-inspector, como layout padronizado, acessibilidade, interações e campos ocultos</li>
+              <li data-en='<b>BPA</b>: model best practices via Tabular Editor 2, such as naming, measure formatting, relationships and unused columns'><b>BPA</b>: boas práticas do modelo via Tabular Editor 2, como nomenclatura, formatação de medidas, relacionamentos e colunas não usadas</li>
+            </ul>
+            <span class="stage__status stage__status--live" data-en="GitHub Actions · pipeline in YAML">GitHub Actions · pipeline em YAML</span>
+          </article>
+
+          <div class="stage-bridge reveal"><span></span><svg class="ico"><use href="#i-git"/></svg><span></span></div>
+
+          <article class="stage stage--2 reveal">
+            <div class="stage__num">02</div>
+            <div class="stage__ico"><svg class="ico"><use href="#i-gauge"/></svg></div>
+            <h3 data-en="Dynamic · on Fabric">Dinâmica · no Fabric</h3>
+            <p class="stage__where" data-en="Runs post-deploy on Fabric · published model with automatic refresh and performance validations">Roda pós-deploy no Fabric · modelo publicado com refresh automático e validações de performance</p>
+            <p class="stage__ex" data-en='<strong>Examples of ready-made validations</strong> <span>(customizable: add or remove as needed)</span>'><strong>Exemplo de validações já construídas</strong> <span>(customizáveis: adicione ou remova conforme a necessidade)</span></p>
+            <ul>
+              <li data-en='<b>Load tests</b>: simulation of concurrent access to the dashboard'><b>Testes de carga</b>: simulação de acessos simultâneos ao dashboard</li>
+              <li data-en='<b>Memory usage</b>: validation of the model consumption within the capacity'><b>Uso de memória</b>: validação do consumo do modelo dentro da capacity</li>
+              <li data-en='<b>Response time</b>: performance of measures and visuals within the limit'><b>Tempo de resposta</b>: performance de medidas e visuais dentro do limite</li>
+            </ul>
+            <span class="stage__status stage__status--soon" data-en="Notebook on Fabric · real usage">Notebook no Fabric · uso real</span>
+          </article>
+        </div>
+      </div>
+      <a href="#arquitetura" class="scroll-hint scroll-hint--section" aria-label="Continuar" data-en='<span></span>keep scrolling to explore'><span></span>continue rolando para explorar</a>
     </section>
 
     <!-- ARQUITETURA -->
     <section id="arquitetura" class="section section--arch" data-theme="cyan">
       <div class="container container--wide">
-        <span class="section__tag reveal">02 · Arquitetura</span>
-        <h2 class="section__title reveal">Do commit ao Fabric, em <span class="hl">duas lanes</span>.</h2>
-        <p class="section__sub reveal">
-          Ao abrir o PR, o GitHub roda a <strong>Etapa 1 (estática)</strong>. Aprovado e mergeado,
-          a integração Git entrega ao Fabric, onde entra a <strong>Etapa 2 (dinâmica)</strong> até produção.
+        <span class="section__tag reveal" data-en="03 · Architecture">03 · Arquitetura</span>
+        <h2 class="section__title reveal" data-en='From commit to Fabric, in <span class="hl">two lanes</span>.'>Do commit ao Fabric, em <span class="hl">duas lanes</span>.</h2>
+        <p class="section__sub reveal" data-en='Development stays in <strong>Power BI Desktop</strong>, with the same experience as always, now <strong>integrated with Git</strong>: versioning, history and collaboration on every change. When the PR is opened, GitHub runs <strong>Stage 1 (static)</strong>; once approved and merged, the <strong>native Fabric-Git integration</strong> delivers the content to the workspace. You choose which branch to link to Fabric, with <strong>bidirectional</strong> sync (changes in Git reflect in Fabric and vice versa), where <strong>Stage 2 (dynamic)</strong> kicks in up to production.'>
+          O desenvolvimento continua no <strong>Power BI Desktop</strong>, com a mesma experiência de sempre,
+          agora <strong>integrado ao Git</strong>: versionamento, histórico e colaboração em cada mudança. Ao abrir
+          o PR, o GitHub roda a <strong>Etapa 1 (estática)</strong>; aprovado e mergeado, a
+          <strong>integração nativa do Fabric com o Git</strong> entrega o conteúdo ao workspace. Você escolhe qual
+          branch vincular ao Fabric, com sincronização <strong>bidirecional</strong> (mudanças no Git refletem no
+          Fabric e vice-versa), onde entra a <strong>Etapa 2 (dinâmica)</strong> até produção.
         </p>
 
         <div class="arch reveal">
@@ -146,28 +263,28 @@
           <div class="lane lane--ci">
             <div class="lane__head">
               <span class="lane__badge"><svg class="ico"><use href="#i-github"/></svg> CI · GitHub</span>
-              <span class="lane__stage">Etapa 1 · Validação Estática (no Pull Request)</span>
+              <span class="lane__stage" data-en="Stage 1 · Static Validation (on the Pull Request)">Etapa 1 · Validação Estática (no Pull Request)</span>
             </div>
             <div class="lane__track">
               <div class="anode">
                 <span class="anode__ic"><img class="brandimg" src="images/power_bi_16_color.png" alt="Power BI" /></span>
-                <b>Power BI Desktop</b><small>dev cria o projeto do PBIP</small>
+                <b>Power BI Desktop</b><small data-en="dev creates the PBIP project">dev cria o projeto do PBIP</small>
                 <span class="anode__info" tabindex="0">i</span>
-                <div class="anode__pop"><b>Desenvolvimento</b>O desenvolvedor cria e edita o relatório e o modelo no Power BI Desktop, no formato PBIP (texto e versionável).</div>
+                <div class="anode__pop" data-en='<b>Development</b>The developer creates and edits the report and the model in Power BI Desktop, in PBIP format (text-based and versionable).'><b>Desenvolvimento</b>O desenvolvedor cria e edita o relatório e o modelo no Power BI Desktop, no formato PBIP (texto e versionável).</div>
               </div>
               <div class="awire"><i></i></div>
               <div class="anode">
                 <span class="anode__ic"><svg class="ico"><use href="#i-github"/></svg></span>
-                <b>Commit → develop</b><small>dev faz push para a branch de trabalho</small>
+                <b>Commit → develop</b><small data-en="dev pushes to the working branch">dev faz push para a branch de trabalho</small>
                 <span class="anode__info" tabindex="0">i</span>
-                <div class="anode__pop"><b>Versionamento</b>O dev faz commit e push das mudanças em uma branch de trabalho (ex.: develop), com histórico e rastreabilidade.</div>
+                <div class="anode__pop" data-en='<b>Versioning</b>The dev commits and pushes changes to a working branch (e.g. develop), with history and traceability.'><b>Versionamento</b>O dev faz commit e push das mudanças em uma branch de trabalho (ex.: develop), com histórico e rastreabilidade.</div>
               </div>
               <div class="awire"><i></i></div>
               <div class="anode anode--accent">
                 <span class="anode__ic"><svg class="ico"><use href="#i-branch"/></svg></span>
-                <b>PR → main</b><small>dev abre Pull Request para a branch main</small>
+                <b>PR → main</b><small data-en="dev opens a Pull Request to the main branch">dev abre Pull Request para a branch main</small>
                 <span class="anode__info" tabindex="0">i</span>
-                <div class="anode__pop"><b>Gatilho</b>O dev abre um Pull Request para a main, que dispara automaticamente o workflow de validação (GitHub Actions).</div>
+                <div class="anode__pop" data-en='<b>Trigger</b>The dev opens a Pull Request to main, which automatically triggers the validation workflow (GitHub Actions).'><b>Gatilho</b>O dev abre um Pull Request para a main, que dispara automaticamente o workflow de validação (GitHub Actions).</div>
               </div>
               <div class="awire"><i></i></div>
               <div class="anode anode--group">
@@ -176,26 +293,26 @@
                   <div class="gnode">
                     <span class="gnode__ic"><svg class="ico"><use href="#i-search"/></svg></span><b>Metadata</b>
                     <span class="anode__info" tabindex="0">i</span>
-                    <div class="anode__pop"><b>Metadata Validation</b>Integridade dos arquivos PBIP. Checa: JSON válido, referências .pbip/.pbir, arquivos obrigatórios e higiene do .gitignore. <i>Python stdlib.</i></div>
+                    <div class="anode__pop" data-en='<b>Metadata Validation</b>Integrity of the PBIP files. Checks: valid JSON, .pbip/.pbir references, required files and .gitignore hygiene. <i>Python stdlib.</i>'><b>Metadata Validation</b>Integridade dos arquivos PBIP. Checa: JSON válido, referências .pbip/.pbir, arquivos obrigatórios e higiene do .gitignore. <i>Python stdlib.</i></div>
                   </div>
                   <div class="gnode">
                     <span class="gnode__ic"><svg class="ico"><use href="#i-chart"/></svg></span><b>Report Rules</b>
                     <span class="anode__info" tabindex="0">i</span>
-                    <div class="anode__pop"><b>Report Rules</b>Boas práticas do relatório. Checa: nº de visuais, cores fora do tema, páginas ocultas e acessibilidade. <i>Fab Inspector (PBI Inspector V2).</i></div>
+                    <div class="anode__pop" data-en='<b>Report Rules</b>Report best practices. Checks: number of visuals, off-theme colors, hidden pages and accessibility. <i>Fab Inspector (PBI Inspector V2).</i>'><b>Report Rules</b>Boas práticas do relatório. Checa: nº de visuais, cores fora do tema, páginas ocultas e acessibilidade. <i>Fab Inspector (PBI Inspector V2).</i></div>
                   </div>
                   <div class="gnode">
                     <span class="gnode__ic"><img class="brandimg" src="images/Tabular%20Editor.png" alt="Tabular Editor" /></span><b>BPA</b>
                     <span class="anode__info" tabindex="0">i</span>
-                    <div class="anode__pop"><b>BPA</b>Boas práticas do modelo semântico. Checa: 75 regras oficiais, DAX, relacionamentos e colunas. Severity 3 bloqueia o merge. <i>Tabular Editor 2.</i></div>
+                    <div class="anode__pop" data-en='<b>BPA</b>Semantic model best practices. Checks: 75 official rules, DAX, relationships and columns. Severity 3 blocks the merge. <i>Tabular Editor 2.</i>'><b>BPA</b>Boas práticas do modelo semântico. Checa: 75 regras oficiais, DAX, relacionamentos e colunas. Severity 3 bloqueia o merge. <i>Tabular Editor 2.</i></div>
                   </div>
                 </div>
               </div>
               <div class="awire"><i></i></div>
               <div class="anode">
                 <span class="anode__ic"><svg class="ico"><use href="#i-shield"/></svg></span>
-                <b>Merge → main</b><small>validação concluída, merge feito e o fluxo segue</small>
+                <b>Merge → main</b><small data-en="validation done, merge completed and the flow continues">validação concluída, merge feito e o fluxo segue</small>
                 <span class="anode__info" tabindex="0">i</span>
-                <div class="anode__pop"><b>Aprovação</b>Com os gates verdes e a revisão aprovada, o merge é feito na main e o fluxo segue para o Fabric.</div>
+                <div class="anode__pop" data-en='<b>Approval</b>With green gates and an approved review, the merge lands on main and the flow continues to Fabric.'><b>Aprovação</b>Com os gates verdes e a revisão aprovada, o merge é feito na main e o fluxo segue para o Fabric.</div>
               </div>
             </div>
           </div>
@@ -215,186 +332,150 @@
           <div class="lane lane--cd">
             <div class="lane__head">
               <span class="lane__badge lane__badge--fabric"><img class="brandimg" src="images/fabric_24_color.png" alt="Fabric" /> CD · Fabric</span>
-              <span class="lane__stage">Etapa 2 · Deploy + Validação Dinâmica</span>
+              <span class="lane__stage" data-en="Stage 2 · Deploy + Dynamic Validation">Etapa 2 · Deploy + Validação Dinâmica</span>
             </div>
             <div class="lane__track">
               <div class="anode">
                 <span class="anode__ic"><img class="brandimg" src="images/fabric_24_color.png" alt="Fabric" /></span>
-                <b>Workspace DEV</b><small>itens sincronizados entre Git e Fabric</small>
+                <b>Workspace DEV</b><small data-en="items synced between Git and Fabric">itens sincronizados entre Git e Fabric</small>
                 <span class="anode__info" tabindex="0">i</span>
-                <div class="anode__pop"><b>Workspace de Dev</b>A integração Git do Fabric sincroniza os itens (Semantic Model + Report) entre o repositório e o workspace de desenvolvimento.</div>
+                <div class="anode__pop" data-en='<b>Dev Workspace</b>The Fabric Git integration syncs the items (Semantic Model + Report) between the repository and the development workspace.'><b>Workspace de Dev</b>A integração Git do Fabric sincroniza os itens (Semantic Model + Report) entre o repositório e o workspace de desenvolvimento.</div>
               </div>
               <div class="awire awire--f"><i></i></div>
               <div class="anode">
                 <span class="anode__ic"><svg class="ico"><use href="#i-notebook"/></svg></span>
-                <b>Notebooks de<br />Performance</b><small>rodam no report a cada novo item</small>
+                <b data-en='Performance<br />Notebooks'>Notebooks de<br />Performance</b><small data-en="run on the report for each new item">rodam no report a cada novo item</small>
                 <span class="anode__info" tabindex="0">i</span>
-                <div class="anode__pop"><b>Validação dinâmica</b>A cada novo item no Fabric, notebooks avaliam a performance do report (refresh, tempos de query) usando o repositório <code>Fabric Toolbox</code> e outras ferramentas.</div>
+                <div class="anode__pop" data-en='<b>Dynamic validation</b>For each new item in Fabric, notebooks assess the report performance (refresh, query times) using the <code>Fabric Toolbox</code> repository and other tools.'><b>Validação dinâmica</b>A cada novo item no Fabric, notebooks avaliam a performance do report (refresh, tempos de query) usando o repositório <code>Fabric Toolbox</code> e outras ferramentas.</div>
               </div>
               <div class="awire awire--f"><i></i></div>
               <div class="anode anode--pipeline">
                 <span class="anode__ic"><svg class="ico"><use href="#i-approve"/></svg></span>
-                <b>Deployment Pipeline</b><small>alguém aprova, deploy em Prod</small>
+                <b>Deployment Pipeline</b><small data-en="someone approves, deploy to Prod">alguém aprova, deploy em Prod</small>
                 <span class="anode__info" tabindex="0">i</span>
-                <div class="anode__pop"><b>Deployment Pipeline · permeável</b>Governa toda a promoção. Um responsável valida e aprova (ou rejeita); aprovado, o item é replicado de Dev para Prod.</div>
+                <div class="anode__pop" data-en='<b>Deployment Pipeline · pervasive</b>Governs the whole promotion. An owner validates and approves (or rejects); once approved, the item is replicated from Dev to Prod.'><b>Deployment Pipeline · permeável</b>Governa toda a promoção. Um responsável valida e aprova (ou rejeita); aprovado, o item é replicado de Dev para Prod.</div>
               </div>
               <div class="awire awire--f"><i></i></div>
               <div class="anode anode--end">
                 <span class="anode__ic"><img class="brandimg" src="images/fabric_24_color.png" alt="Fabric" /></span>
-                <b>Workspace PROD</b><small>publicado</small>
+                <b>Workspace PROD</b><small data-en="published">publicado</small>
                 <span class="anode__info" tabindex="0">i</span>
-                <div class="anode__pop"><b>Produção</b>Após aprovação, o item é promovido ao workspace de produção, disponível para consumo.</div>
+                <div class="anode__pop" data-en='<b>Production</b>After approval, the item is promoted to the production workspace, available for consumption.'><b>Produção</b>Após aprovação, o item é promovido ao workspace de produção, disponível para consumo.</div>
               </div>
               <div class="awire awire--f"><i></i></div>
               <div class="anode">
                 <span class="anode__ic"><svg class="ico"><use href="#i-gauge"/></svg></span>
-                <b>Capacity Metrics</b><small>monitoramento</small>
+                <b>Capacity Metrics</b><small data-en="monitoring">monitoramento</small>
                 <span class="anode__info" tabindex="0">i</span>
-                <div class="anode__pop"><b>Fabric Capacity Metrics App</b>Monitoramento contínuo de consumo e performance do report/capacidade em produção.</div>
+                <div class="anode__pop" data-en='<b>Fabric Capacity Metrics App</b>Continuous monitoring of consumption and performance of the report/capacity in production.'><b>Fabric Capacity Metrics App</b>Monitoramento contínuo de consumo e performance do report/capacidade em produção.</div>
               </div>
               <div class="awire awire--f awire--bi"><i></i></div>
               <div class="anode">
                 <span class="anode__ic"><svg class="ico"><use href="#i-eye"/></svg></span>
-                <b>Consumo /<br />Visualização</b><small>usuários finais</small>
+                <b data-en='Consumption /<br />Viewing'>Consumo /<br />Visualização</b><small data-en="end users">usuários finais</small>
                 <span class="anode__info" tabindex="0">i</span>
-                <div class="anode__pop"><b>Consumo / Visualização</b>Os usuários finais consomem o report por um <i>Power BI App</i>, evitando acesso direto ao workspace: mais governança, segurança e uma experiência organizada.</div>
+                <div class="anode__pop" data-en='<b>Consumption / Viewing</b>End users consume the report through a <i>Power BI App</i>, avoiding direct access to the workspace: more governance, security and an organized experience.'><b>Consumo / Visualização</b>Os usuários finais consomem o report por um <i>Power BI App</i>, evitando acesso direto ao workspace: mais governança, segurança e uma experiência organizada.</div>
               </div>
             </div>
-            <div class="lane__band"><svg class="ico"><use href="#i-shield"/></svg> <b>Deployment Pipeline</b> permeia todo o CD: aprovação humana promove <b>Dev → Prod</b></div>
+            <div class="lane__band" data-en='<svg class="ico"><use href="#i-shield"/></svg> <b>Deployment Pipeline</b> pervades the whole CD: human approval promotes <b>Dev → Prod</b>'><svg class="ico"><use href="#i-shield"/></svg> <b>Deployment Pipeline</b> permeia todo o CD: aprovação humana promove <b>Dev → Prod</b></div>
           </div>
         </div>
-        <p class="arch__hint reveal">💡 Passe o mouse sobre o <span class="dot-i">i</span> de cada etapa para ver o que ela faz.</p>
+        <p class="arch__hint reveal" data-en='💡 Hover the <span class="dot-i">i</span> of each step to see what it does.'>💡 Passe o mouse sobre o <span class="dot-i">i</span> de cada etapa para ver o que ela faz.</p>
       </div>
-    </section>
-
-    <!-- ETAPAS -->
-    <section id="etapas" class="section" data-theme="emerald">
-      <div class="container">
-        <span class="section__tag reveal">03 · Modelo de validação</span>
-        <h2 class="section__title reveal">São <span class="hl">duas etapas</span> que se completam.</h2>
-        <p class="section__sub reveal">
-          A validação não é um passo só. Ela acontece em dois momentos com objetivos diferentes:
-          antes do merge (barata, sem capacity) e depois no Fabric (com dados reais).
-        </p>
-
-        <div class="stages">
-          <article class="stage stage--1 reveal">
-            <div class="stage__num">01</div>
-            <div class="stage__ico"><svg class="ico"><use href="#i-shield"/></svg></div>
-            <h3>Estática · no GitHub</h3>
-            <p class="stage__where">Roda no Pull Request · runners efêmeros · sem Fabric</p>
-            <ul>
-              <li><b>Metadata</b>: integridade dos arquivos</li>
-              <li><b>Report Rules</b>: boas práticas do relatório</li>
-              <li><b>BPA</b>: boas práticas do modelo</li>
-            </ul>
-            <span class="stage__status stage__status--live">✔ Implementada</span>
-          </article>
-
-          <div class="stage-bridge reveal"><span></span><svg class="ico"><use href="#i-git"/></svg><span></span></div>
-
-          <article class="stage stage--2 reveal">
-            <div class="stage__num">02</div>
-            <div class="stage__ico"><svg class="ico"><use href="#i-gauge"/></svg></div>
-            <h3>Dinâmica · no Fabric</h3>
-            <p class="stage__where">Roda pós-deploy · exige modelo publicado + refresh</p>
-            <ul>
-              <li><b>Refresh test</b>: o modelo atualiza sem erro</li>
-              <li><b>DAX tests</b>: medidas retornam o valor esperado</li>
-              <li><b>Performance</b>: tempo de resposta dentro do limite</li>
-            </ul>
-            <span class="stage__status stage__status--soon">◷ A documentar (Fase 2)</span>
-          </article>
-        </div>
-      </div>
+      <a href="#incremental" class="scroll-hint scroll-hint--section" aria-label="Continuar" data-en='<span></span>keep scrolling to explore'><span></span>continue rolando para explorar</a>
     </section>
 
     <!-- INCREMENTAL -->
     <section id="incremental" class="section" data-theme="amber">
       <div class="container">
-        <span class="section__tag reveal">04 · Inteligência &amp; Colaboração</span>
-        <h2 class="section__title reveal">Valida só o que <span class="hl">mudou</span>.</h2>
-        <p class="section__sub reveal">Vários times podem colaborar no mesmo repositório, trabalhando em conjunto. Um job de descoberta faz o <code>diff</code> do PR contra a base e valida <strong>apenas os projetos PBIP alterados</strong>, então a esteira foca só no que mudou. Inteligência e colaboração, sem travar o time.</p>
+        <span class="section__tag reveal" data-en="04 · Intelligence &amp; Collaboration">04 · Inteligência &amp; Colaboração</span>
+        <h2 class="section__title reveal" data-en='It validates only what <span class="hl">changed</span>.'>Valida só o que <span class="hl">mudou</span>.</h2>
+        <p class="section__sub reveal" data-en='With reports, models and dashboards <strong>versioned in Git</strong>, several teams and people collaborate in the same repository, in parallel. Right at the start of static validation, a <strong>discovery job</strong> runs a <code>diff</code> of the PR against the base and selects <strong>only the changed PBIP projects</strong>, so the pipeline focuses only on what changed. Intelligence and collaboration, without blocking the team.'>Com reports, modelos e dashboards <strong>versionados no Git</strong>, vários times e pessoas colaboram no mesmo repositório, em paralelo. Logo no início da validação estática, um <strong>job de descoberta</strong> faz o <code>diff</code> do PR contra a base e seleciona <strong>apenas os projetos PBIP alterados</strong>, então a esteira foca só no que mudou. Inteligência e colaboração, sem travar o time.</p>
         <div class="split">
           <div class="split__visual reveal">
+            <p class="split__label" data-en="Example of a Git repository with more than one Power BI Project (.pbip)">Exemplo de repositório no Git com mais de um Power BI Project (.pbip)</p>
             <div class="repo">
-              <div class="repo__item is-idle"><svg class="ico"><use href="#i-cube"/></svg> pbi-project <em>inalterado</em></div>
-              <div class="repo__item is-changed"><svg class="ico"><use href="#i-cube"/></svg> pbi-project2 <em>alterado ✎</em></div>
+              <div class="repo__item is-idle"><svg class="ico"><use href="#i-cube"/></svg> Financeiro.pbip <em data-en="unchanged">inalterado</em></div>
+              <div class="repo__item is-changed"><svg class="ico"><use href="#i-cube"/></svg> Vendas.pbip <em data-en="changed ✎">alterado ✎</em></div>
             </div>
             <div class="picked">
               <div class="picked__chip"><svg class="ico"><use href="#i-search"/></svg> Discover_Projects</div>
-              <div class="picked__out"><b>pbi-project2</b><small>selecionado p/ validar</small></div>
+              <div class="picked__out"><b>Vendas.pbip</b><small data-en="selected to validate">selecionado p/ validar</small></div>
             </div>
           </div>
           <div class="split__text">
-            <div class="feat reveal"><b>PR</b><p>valida apenas os projetos alterados.</p></div>
-            <div class="feat reveal"><b>Manual</b><p><code>workflow_dispatch</code> valida todos.</p></div>
-            <div class="feat reveal"><b>Zero config</b><p>projeto novo é descoberto automaticamente.</p></div>
+            <div class="feat reveal"><b data-en="Team collaboration">Colaboração em equipe</b><p data-en='reports, models and dashboards versioned in Git; several teams work in parallel in the same repository.'>reports, modelos e dashboards versionados no Git; vários times trabalham em paralelo no mesmo repositório.</p></div>
+            <div class="feat reveal"><b data-en="Diff-based discovery">Descoberta por diff</b><p data-en='at the start of static validation, a job compares the PR with the base and selects only the changed <code>.pbip</code>.'>no início da validação estática, um job compara o PR com a base e seleciona só os <code>.pbip</code> alterados.</p></div>
+            <div class="feat reveal"><b data-en="Focus on what changed">Foco no que mudou</b><p data-en='on the PR, it validates only the changed projects; <code>workflow_dispatch</code> revalidates all on demand.'>no PR, valida apenas os projetos alterados; <code>workflow_dispatch</code> revalida todos sob demanda.</p></div>
+            <div class="feat reveal"><b data-en="Zero config">Zero config</b><p data-en='a new project enters the repository and is discovered automatically, with no changes to the pipeline.'>projeto novo entra no repositório e é descoberto automaticamente, sem ajustes na esteira.</p></div>
           </div>
         </div>
       </div>
+      <a href="#severidades" class="scroll-hint scroll-hint--section" aria-label="Continuar" data-en='<span></span>keep scrolling to explore'><span></span>continue rolando para explorar</a>
     </section>
 
     <!-- SEVERIDADES -->
     <section id="severidades" class="section" data-theme="rose">
       <div class="container">
-        <span class="section__tag reveal">05 · Customização &amp; Parametrização</span>
-        <h2 class="section__title reveal">A severidade decide se <span class="hl">bloqueia</span>.</h2>
-        <p class="section__sub reveal">Parametrização BPA: o campo <code>CustomSeverity</code> controla como as violações da análise do BPA são classificadas e o que reprova o build (por exemplo: só o nível 3 bloqueia; o resto é aviso ou sugestão). As outras validações não têm esse campo: o <strong>Report Rules</strong> é parametrizável pelo seu arquivo de regras (mudar limites ou desativar regras) e o <strong>Metadata</strong> roda checagens fixas de integridade. Foco em customização e parametrização.</p>
+        <span class="section__tag reveal" data-en="05 · Customization &amp; Parametrization">05 · Customização &amp; Parametrização</span>
+        <h2 class="section__title reveal" data-en='Severity decides whether it <span class="hl">blocks</span>.'>A severidade decide se <span class="hl">bloqueia</span>.</h2>
+        <p class="section__sub reveal" data-en='Each validation, static or dynamic, has an <strong>approval criterion</strong> defined by your company. You assign a <strong>severity (score)</strong> to each rule, including the ones your team creates, and decide what only warns and what <strong>fails</strong> the change. This way, each result guides the user to <strong>proceed</strong> or <strong>fix</strong> before publishing.'>Cada validação, estática ou dinâmica, tem um <strong>critério de aprovação</strong> definido pela sua empresa. Você atribui uma <strong>severidade (nota)</strong> a cada regra, inclusive às que o seu time criar, e decide o que apenas avisa e o que <strong>reprova</strong> a mudança. Assim, cada retorno orienta o usuário a <strong>seguir</strong> ou <strong>corrigir</strong> antes de publicar.</p>
+        <p class="stage__ex" data-en='<strong>Example: BPA rule severity</strong>'><strong>Exemplo: severidade das regras de BPA</strong></p>
         <div class="sev-grid">
-          <div class="sev sev--3 reveal"><span class="sev__lvl">3</span><h3>Must Correct</h3><p>Reprova o build e bloqueia o merge.</p><span class="sev__label">bpa-failed</span></div>
-          <div class="sev sev--2 reveal"><span class="sev__lvl">2</span><h3>Correct ASAP</h3><p>Passa, mas alerta no comentário.</p><span class="sev__label">bpa-warning</span></div>
-          <div class="sev sev--1 reveal"><span class="sev__lvl">1</span><h3>Nice to Have</h3><p>Sugestão de boa prática.</p><span class="sev__label">bpa-passed</span></div>
+          <div class="sev sev--3 reveal"><span class="sev__lvl">3</span><h3>Must Correct</h3><p data-en="Fails the build and blocks the merge.">Reprova o build e bloqueia o merge.</p><span class="sev__label">bpa-failed</span></div>
+          <div class="sev sev--2 reveal"><span class="sev__lvl">2</span><h3>Correct ASAP</h3><p data-en="Passes, but warns in the comment.">Passa, mas alerta no comentário.</p><span class="sev__label">bpa-warning</span></div>
+          <div class="sev sev--1 reveal"><span class="sev__lvl">1</span><h3>Nice to Have</h3><p data-en="Best-practice suggestion.">Sugestão de boa prática.</p><span class="sev__label">bpa-passed</span></div>
         </div>
         <div class="pr-preview reveal">
-          <div class="pr-preview__bar"><i></i><i></i><i></i><span>Pull Request · comentário automático</span></div>
+          <div class="pr-preview__bar"><i></i><i></i><i></i><span data-en="Pull Request · automatic comment">Pull Request · comentário automático</span></div>
           <div class="pr-preview__body">
-            <p><b>Deploy bloqueado</b>: 1 issue Severity 3 encontrado.</p>
+            <p data-en="<b>Deploy blocked</b>: 1 Severity 3 issue found."><b>Deploy bloqueado</b>: 1 issue Severity 3 encontrado.</p>
             <div class="pr-line pr-line--err">S3 · Avoid division (use DIVIDE) · <code>Measure 'Margin %'</code></div>
             <div class="pr-line pr-line--warn">S2 · Provide format string · <code>Measure 'Revenue'</code></div>
             <div class="pr-line pr-line--ok">S1 · Add description · <code>Table 'Sales'</code></div>
           </div>
         </div>
       </div>
+      <a href="#fabric" class="scroll-hint scroll-hint--section" aria-label="Continuar" data-en='<span></span>keep scrolling to explore'><span></span>continue rolando para explorar</a>
     </section>
 
     <!-- FABRIC -->
     <section id="fabric" class="section" data-theme="cyan">
       <div class="container">
-        <span class="section__tag reveal">06 · Destino</span>
-        <h2 class="section__title reveal">Aprovado? Vai para o <span class="hl">Fabric</span>.</h2>
-        <p class="section__sub reveal">A integração Git do Fabric leva a <strong>definição</strong> do item. Modelos import chegam prontos, mas precisam de um <em>refresh</em> para materializar os dados (início da Etapa 2).</p>
-        <div class="cards cards--2">
-          <article class="card card--wide reveal"><div class="card__ico"><svg class="ico"><use href="#i-git"/></svg></div><h3>Git Integration</h3><p>Merge na <code>main</code> → o workspace de Dev recebe Semantic Model e Report automaticamente.</p></article>
-          <article class="card card--wide reveal"><div class="card__ico"><svg class="ico"><use href="#i-refresh"/></svg></div><h3>Refresh = dados</h3><p>Integração ≠ refresh. Um <b>Refresh now</b> (ou via REST API) popula o modelo. Dados inline dispensam gateway.</p></article>
+        <span class="section__tag reveal" data-en="06 · Destination">06 · Destino</span>
+        <h2 class="section__title reveal" data-en='Approved? It goes to <span class="hl">Fabric</span>.'>Aprovado? Vai para o <span class="hl">Fabric</span>.</h2>
+        <p class="section__sub reveal" data-en='The integration is <strong>native</strong> between Git and Fabric. You link the branch to the workspace with <strong>bidirectional</strong> sync: changes in Git reach Fabric and edits made in Fabric flow back to Git, with no manual export or import. After the deploy, <strong>Stage 2 (dynamic)</strong> kicks in and the <strong>Fabric Capacity Metrics App</strong> tracks the capacity consumption continuously.'>A integração é <strong>nativa</strong> entre o Git e o Fabric. Você vincula a branch ao workspace com sincronização <strong>bidirecional</strong>: mudanças no Git chegam ao Fabric e ajustes feitos no Fabric voltam ao Git, sem exportar ou importar nada à mão. Depois do deploy entra a <strong>Etapa 2 (dinâmica)</strong> e o <strong>Fabric Capacity Metrics App</strong> acompanha o consumo da capacity de forma contínua.</p>
+        <div class="cards cards--3">
+          <article class="card reveal"><div class="card__ico"><svg class="ico"><use href="#i-git"/></svg></div><h3 data-en="Native integration (bidirectional)">Integração nativa (bidirecional)</h3><p data-en='Link the branch to the workspace: changes in Git reflect in Fabric and edits in Fabric flow back to Git. The integration delivers the item <b>definition</b>; a <em>refresh</em> materializes the data.'>Vincule a branch ao workspace: mudanças no Git refletem no Fabric e ajustes no Fabric voltam ao Git. A integração entrega a <b>definição</b> do item; um <em>refresh</em> materializa os dados.</p></article>
+          <article class="card reveal"><div class="card__ico"><svg class="ico"><use href="#i-shield"/></svg></div><h3>Deployment Pipelines</h3><p data-en='Promote content across workspaces (<b>Dev → Prod</b>) with human approval, keeping governance and traceability up to production.'>Promova o conteúdo entre workspaces (<b>Dev → Prod</b>) com aprovação humana, mantendo governança e rastreabilidade até produção.</p></article>
+          <article class="card reveal"><div class="card__ico"><svg class="ico"><use href="#i-gauge"/></svg></div><h3 data-en="Continuous monitoring">Monitoramento contínuo</h3><p data-en='<b>Fabric Capacity Metrics App</b>: track CU consumption, throttling and capacity spikes to keep performance and cost under control.'><b>Fabric Capacity Metrics App</b>: acompanhe consumo de CU, throttling e picos da capacity para manter performance e custo sob controle.</p></article>
         </div>
         <div class="phase-flow reveal">
-          <span class="phase">Dev</span><span class="phase-arrow">→ deployment pipeline →</span><span class="phase phase--ghost">Prod</span><em>(Fase 2)</em>
+          <span class="phase">Dev</span><span class="phase-arrow">→ deployment pipeline →</span><span class="phase">Prod</span>
         </div>
       </div>
+      <a href="#final" class="scroll-hint scroll-hint--section" aria-label="Continuar" data-en='<span></span>keep scrolling to explore'><span></span>continue rolando para explorar</a>
     </section>
 
-    <!-- ROADMAP -->
-    <section id="roadmap" class="section" data-theme="violet">
+    <!-- FECHAMENTO -->
+    <div class="closing" id="final">
       <div class="container">
-        <span class="section__tag reveal">07 · Evolução</span>
-        <h2 class="section__title reveal">O <span class="hl">roadmap</span> da esteira.</h2>
-        <div class="timeline">
-          <div class="tl reveal is-done"><span class="tl__dot"></span><h3>Etapa 1 · GitHub <b>✓</b></h3><ul><li>Gate de BPA + comentário e labels</li><li>Metadata + Report Rules</li><li>Gates dinâmicos e incrementais</li></ul></div>
-          <div class="tl reveal is-next"><span class="tl__dot"></span><h3>Etapa 2 · Fabric</h3><ul><li>Refresh automático via REST API (SPN)</li><li>DAX tests + performance</li><li>Deployment pipeline Dev → Prod</li></ul></div>
-          <div class="tl reveal"><span class="tl__dot"></span><h3>Futuro</h3><ul><li>Branch protection obrigando o check</li><li>Sync do ruleset oficial</li></ul></div>
-        </div>
         <div class="cta-final reveal">
-          <h2>Qualidade automatizada, <span class="hl">do commit ao Fabric</span>.</h2>
-          <a href="https://github.com/joaopedropeira/fabric-ci-cd" target="_blank" rel="noopener" class="btn btn--primary btn--lg"><svg class="ico"><use href="#i-github"/></svg> Explorar o repositório</a>
+          <h2 data-en='Automated quality, <span class="hl">from commit to Fabric</span>.'>Qualidade automatizada, <span class="hl">do commit ao Fabric</span>.</h2>
+          <a href="https://github.com/joaopedropeira/fabric-ci-cd" target="_blank" rel="noopener" class="btn btn--primary btn--lg" data-en='<svg class="ico"><use href="#i-github"/></svg> Explore the repository'><svg class="ico"><use href="#i-github"/></svg> Explorar o repositório</a>
         </div>
         <footer class="foot">
           <p>Pipeline-as-code · GitHub Actions · Tabular Editor 2 · Fab Inspector · Microsoft Fabric</p>
-          <p class="foot__dim">Demo/PoC, feito para demonstrar a integração Power BI → GitHub → Fabric.</p>
+          <p class="foot__dim" data-en="Built to demonstrate the Power BI → GitHub → Fabric integration.">Feito para demonstrar a integração Power BI → GitHub → Fabric.</p>
         </footer>
       </div>
-    </section>
+    </div>
   </main>
+
+  <div class="lightbox" id="lightbox" aria-hidden="true">
+    <button class="lightbox__close" aria-label="Fechar">&times;</button>
+    <img class="lightbox__img" src="" alt="" />
+  </div>
 
   <script src="js/main.js"></script>
 </body>
