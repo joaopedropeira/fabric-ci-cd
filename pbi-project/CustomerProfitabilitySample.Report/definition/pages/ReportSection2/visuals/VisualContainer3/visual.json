@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
   "name": "VisualContainer3",
   "position": {
-    "x": 179.2,
-    "y": 97.28,
+    "x": 179.11178497587872,
+    "y": 97.812818745692624,
     "z": 3000,
-    "height": 281.6,
-    "width": 495.36
+    "height": 228.65334252239836,
+    "width": 398.87305306685045
   },
   "visual": {
     "visualType": "areaChart",
