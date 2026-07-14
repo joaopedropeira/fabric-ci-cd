@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
   "name": "VisualContainer4",
   "position": {
-    "x": 651.66202618883528,
-    "y": 118.13756030323916,
+    "x": 708.82536181943487,
+    "y": 144.81378359751895,
     "z": 4000,
-    "height": 251.51867677463818,
-    "width": 619.90461750516886
+    "height": 224.84245348035839,
+    "width": 562.74128187456927
   },
   "visual": {
     "visualType": "treemap",
