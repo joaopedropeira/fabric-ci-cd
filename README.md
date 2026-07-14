@@ -2,7 +2,8 @@
 
 <img src="web/favicon.svg" width="84" alt="Logo do projeto" />
 
-# Power BI → GitHub → Fabric · Esteira de CI/CD com Quality Gates
+# Power BI → GitHub → Fabric
+### Esteira de CI/CD com Quality Gates
 
 **Versione, padronize e certifique seu Power BI em escala enterprise, com _quality gates_ automáticos antes e depois de cada publicação.**
 
@@ -12,6 +13,7 @@
 [![BPA Rules](https://img.shields.io/badge/BPA-regras_built--in-7C5CFF)](scripts/bpa/BPA_Rules.json)
 
 📖 **Página explicativa (interativa):** _link público em breve_
+<br />
 <sub><u>o conteúdo visual/animado deste repositório está na pasta [`web/`](web/) e será publicado como site (GitHub Pages).</u></sub>
 
 </div>
