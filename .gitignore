@@ -5,11 +5,3 @@ BPA_Results.csv
 must_correct.csv
 correct_asap.csv
 nice_to_have.csv
-
-# Projeto de demonstracao ao vivo: mantido fora do Git ate a apresentacao.
-# Para acionar a esteira na frente do cliente, remova a linha abaixo e faca
-# `git add pbi-project3` + commit + push (o gate incremental valida so ele).
-pbi-project3/
-
-# Notebook exploratorio com credenciais hardcoded: NAO commitar.
-Teste_QA*.ipynb

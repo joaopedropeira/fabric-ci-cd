@@ -112,10 +112,38 @@
           <div class="ql-panels">
             <div class="ql-panel is-active" data-panel="video">
               <div class="video-frame">
-                <!-- Quando o video existir, troque o bloco abaixo por:
-                     <video controls poster="images/video-poster.png" src="assets/demo.mp4"></video> -->
-                <button class="video-play" aria-label="Reproduzir video"><svg class="ico"><use href="#i-play"/></svg></button>
-                <span class="video-soon" data-en="VIDEO COMING SOON">VÍDEO EM BREVE</span>
+                <video id="heroVideo" preload="metadata" playsinline src="images/PowerBI-CI-CD.mp4">
+                  Seu navegador não suporta vídeo HTML5.
+                </video>
+              </div>
+
+              <!-- Player customizado: barra + marcos (milestones) + controles.
+                   Ajuste data-time (em segundos) de cada .vmile se precisar. -->
+              <div class="vplayer" id="vplayer">
+                <div class="vctrl">
+                  <div class="vplay-wrap">
+                    <button class="vplay" id="vPlay" type="button" aria-label="Reproduzir / pausar">
+                      <svg class="vplay__i vplay__play" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+                      <svg class="vplay__i vplay__pause" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></svg>
+                    </button>
+                    <span class="vtime"><span id="vCur">0:00</span> / <span id="vDur">0:00</span></span>
+                  </div>
+                  <div class="vtimeline" id="vTimeline" role="slider" tabindex="0" aria-label="Progresso do vídeo">
+                    <div class="vtrack"><div class="vfill" id="vFill"></div></div>
+                    <div class="vthumb" id="vThumb"></div>
+                    <button class="vmile" type="button" data-time="41"><span class="vmile__dot"></span><span class="vmile__cap" data-en="Commit + PR">Commit + PR</span><span class="vmile__label" data-en="Report changed, commit made and PR opened.">Report modificado, commit realizado e PR aberto.</span></button>
+                    <button class="vmile" type="button" data-time="65"><span class="vmile__dot"></span><span class="vmile__cap" data-en="GitHub Actions">GitHub Actions</span><span class="vmile__label" data-en="GitHub Actions (static validations).">GitHub Actions (validações estáticas).</span></button>
+                    <button class="vmile" type="button" data-time="87"><span class="vmile__dot"></span><span class="vmile__cap" data-en="Results">Resultados</span><span class="vmile__label" data-en="Results! Here we proceed (it is a demo); the idea is to stop the PR when rules are not met.">Resultados! Aqui seguimos com o deploy (é uma demo); a ideia é parar o PR se as regras não forem cumpridas.</span></button>
+                    <button class="vmile" type="button" data-time="110"><span class="vmile__dot"></span><span class="vmile__cap" data-en="Fabric ↔ GitHub">Fabric ↔ GitHub</span><span class="vmile__label" data-en="Native Fabric + GitHub integration (Git changes reach Fabric).">Integração nativa Fabric + GitHub (mudanças do Git chegam ao Fabric).</span></button>
+                    <button class="vmile" type="button" data-time="130"><span class="vmile__dot"></span><span class="vmile__cap" data-en="Dynamic validation">Validação dinâmica</span><span class="vmile__label" data-en="Dynamic validation results: performance, scalability, etc.">Resultados da validação dinâmica: performance, escalabilidade etc.</span></button>
+                    <button class="vmile" type="button" data-time="150"><span class="vmile__dot"></span><span class="vmile__cap" data-en="Deploy Dev → Prod">Deploy Dev → Prod</span><span class="vmile__label" data-en="Ways to deploy from the Dev workspace to Production.">Maneiras de deploy do workspace Dev para o de Produção.</span></button>
+                    <button class="vmile" type="button" data-time="170"><span class="vmile__dot"></span><span class="vmile__cap" data-en="Published">Publicado</span><span class="vmile__label" data-en="Final result validation and item published in Fabric.">Validação final do resultado e item publicado no Fabric.</span></button>
+                  </div>
+                  <button class="vbtn vspeed" id="vSpeed" type="button" aria-label="Velocidade de reprodução">1&times;</button>
+                  <button class="vbtn" id="vFs" type="button" aria-label="Tela cheia">
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                </div>
               </div>
             </div>
             <div class="ql-panel" data-panel="arch">
