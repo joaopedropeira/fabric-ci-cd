@@ -12,9 +12,7 @@
 [![Microsoft Fabric](https://img.shields.io/badge/Microsoft_Fabric-Dev_%E2%86%92_Prod-26C6DA)](#-roadmap)
 [![BPA Rules](https://img.shields.io/badge/BPA-regras_built--in-7C5CFF)](scripts/bpa/BPA_Rules.json)
 
-📖 **Página explicativa (interativa):** _link público em breve_
-<br />
-<sub><u>o conteúdo visual/animado deste repositório está na pasta [`web/`](web/) e será publicado como site (GitHub Pages).</u></sub>
+📖 **Página explicativa (interativa):** **[white-meadow-0edcbf410.7.azurestaticapps.net](https://white-meadow-0edcbf410.7.azurestaticapps.net/)**
 
 </div>
 
@@ -160,8 +158,8 @@ em paralelo. Logo no início, um **job de descoberta** faz o `diff` do PR contra
 
 | Cenário | O que é validado |
 |---|---|
-| PR altera só `pbi-project2` | apenas `pbi-project2` |
-| PR altera dois projetos | ambos |
+| PR altera um projeto | apenas o projeto alterado |
+| PR altera vários projetos | todos os alterados |
 | PR não toca nenhum PBIP (só docs/scripts) | nada (_no-op_, passa) |
 | Execução manual (`workflow_dispatch`) | **todos** os projetos (fallback seguro) |
 
@@ -191,9 +189,7 @@ Cada gate posta um comentário automático (em **pt-br**), seguindo o mesmo padr
 fabric-ci-cd/
 ├─ .github/workflows/
 │  └─ bpa-quality-gate.yml        # A esteira (pipeline-as-code)
-├─ pbi-project/                   # Demo 1: Customer Profitability Sample (PBIP)
-├─ pbi-project2/                  # Demo 2: projeto mínimo self-contained (dados inline)
-├─ pbi-project3/                  # Demo 3
+├─ pbi-project/                   # Projeto demo: Customer Profitability Sample (PBIP)
 ├─ scripts/
 │  ├─ metadata_validation/        # Gate 1 · integridade dos arquivos PBIP
 │  │  ├─ pbip_metadata_validation.py
@@ -201,16 +197,14 @@ fabric-ci-cd/
 │  ├─ fab_validator/              # Gate 2 · boas práticas do relatório
 │  │  ├─ fabinspector-report-rules.json
 │  │  └─ fabinspector_pr_comment.py
-│  └─ bpa/                        # Gate 3 · boas práticas do modelo
-│     ├─ Custom_TA_Macro_for_BPA.csx
-│     ├─ BPA_Rules.json           # As 75+ regras + CustomSeverity
-│     ├─ bpa_rules.md             # Documentação das regras (links do PR)
-│     ├─ bpa_result_analysis.py
-│     └─ pr_comment.py
-├─ notebooks/                     # Validações dinâmicas no Fabric
-├─ docs/
-│  └─ EXPLICACAO.md               # Documentação técnica aprofundada (memória do projeto)
-└─ web/                           # Página explicativa interativa (vira link público)
+│  ├─ bpa/                        # Gate 3 · boas práticas do modelo
+│  │  ├─ Custom_TA_Macro_for_BPA.csx
+│  │  ├─ BPA_Rules.json           # As regras built-in + CustomSeverity
+│  │  ├─ bpa_rules.md             # Documentação das regras (links do PR)
+│  │  ├─ bpa_result_analysis.py
+│  │  └─ pr_comment.py
+│  └─ notebooks/                  # Validações dinâmicas no Fabric (Etapa 2 · CD)
+└─ web/                           # Página explicativa interativa (site público)
 ```
 
 ---
@@ -320,9 +314,7 @@ fato, ative a _branch protection_ na `main`: `Settings → Branches → Add bran
 
 ## 📚 Referências e créditos
 
-- 📖 **Documentação técnica aprofundada:** [`docs/EXPLICACAO.md`](docs/EXPLICACAO.md): memória do
-  projeto, decisões de design, anatomia das regras e conceitos.
-- 🌐 **Página explicativa interativa:** pasta [`web/`](web/) (será publicada como link público).
+- 🌐 **Página explicativa interativa (site público):** [white-meadow-0edcbf410.7.azurestaticapps.net](https://white-meadow-0edcbf410.7.azurestaticapps.net/) (código em [`web/`](web/)).
 - 🔗 **Projeto de referência que inspirou a implementação:**
   [vlpatkosdani/powerbi-cicd-with-githubactions-demos](https://github.com/vlpatkosdani/powerbi-cicd-with-githubactions-demos).
 - 🧠 **Regras oficiais de BPA (Microsoft / Michael Kovalsky):**
