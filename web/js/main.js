@@ -246,4 +246,101 @@
       }
     });
   });
+
+  /* ============================================================
+     9) Quick Look tabs (Vídeo / Arquitetura)
+     ============================================================ */
+  const qlTabs = Array.from(document.querySelectorAll('.ql-tab'));
+  const qlPanels = Array.from(document.querySelectorAll('.ql-panel'));
+  const qlTabsEl = document.querySelector('.ql-tabs');
+  qlTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const name = tab.dataset.tab;
+      qlTabs.forEach(t => {
+        const active = t === tab;
+        t.classList.toggle('is-active', active);
+        t.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      qlPanels.forEach(p => p.classList.toggle('is-active', p.dataset.panel === name));
+      if (qlTabsEl) qlTabsEl.classList.toggle('is-arch', name === 'arch');
+    });
+  });
+
+  /* ============================================================
+     10) Lightbox (zoom da imagem de arquitetura)
+     ============================================================ */
+  const lightbox = document.getElementById('lightbox');
+  if (lightbox) {
+    const lightboxImg = lightbox.querySelector('.lightbox__img');
+    const openLightbox = (src, alt) => {
+      lightboxImg.src = src;
+      lightboxImg.alt = alt || '';
+      lightbox.classList.add('is-open');
+      lightbox.setAttribute('aria-hidden', 'false');
+    };
+    const closeLightbox = () => {
+      lightbox.classList.remove('is-open');
+      lightbox.setAttribute('aria-hidden', 'true');
+    };
+    document.querySelectorAll('.video-frame--img img').forEach(img => {
+      img.addEventListener('click', () => openLightbox(img.src, img.alt));
+    });
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox || e.target.classList.contains('lightbox__close') || e.target.classList.contains('lightbox__img')) {
+        closeLightbox();
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && lightbox.classList.contains('is-open')) closeLightbox();
+    });
+  }
+
+  /* ============================================================
+     11) DARK/LIGHT MODE TOGGLE  (remover este bloco p/ rollback)
+     ============================================================ */
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle) {
+    const applyMode = (mode) => {
+      document.body.classList.toggle('light-mode', mode === 'light');
+      themeToggle.setAttribute('aria-pressed', mode === 'light' ? 'true' : 'false');
+    };
+    let saved = null;
+    try { saved = localStorage.getItem('pbi-theme'); } catch (e) {}
+    applyMode(saved === 'light' ? 'light' : 'dark');
+    themeToggle.addEventListener('click', () => {
+      const next = document.body.classList.contains('light-mode') ? 'dark' : 'light';
+      applyMode(next);
+      try { localStorage.setItem('pbi-theme', next); } catch (e) {}
+    });
+  }
+
+  /* ============================================================
+     12) LANGUAGE TOGGLE PT/EN  (remover este bloco p/ rollback)
+     ============================================================ */
+  const langToggle = document.getElementById('langToggle');
+  if (langToggle) {
+    const langLabel = document.getElementById('langLabel');
+    const i18nNodes = Array.from(document.querySelectorAll('[data-en]'));
+    const labelNodes = Array.from(document.querySelectorAll('[data-label-en]'));
+    const ptHTML = new Map();
+    const ptLabel = new Map();
+    i18nNodes.forEach(n => ptHTML.set(n, n.innerHTML));
+    labelNodes.forEach(n => ptLabel.set(n, n.getAttribute('data-label')));
+    const applyLang = (lang) => {
+      const en = lang === 'en';
+      i18nNodes.forEach(n => { n.innerHTML = en ? n.getAttribute('data-en') : ptHTML.get(n); });
+      labelNodes.forEach(n => { n.setAttribute('data-label', en ? n.getAttribute('data-label-en') : ptLabel.get(n)); });
+      document.documentElement.lang = en ? 'en' : 'pt-BR';
+      if (langLabel) langLabel.textContent = en ? 'EN' : 'PT';
+      langToggle.setAttribute('aria-pressed', en ? 'true' : 'false');
+    };
+    let savedLang = null;
+    try { savedLang = localStorage.getItem('pbi-lang'); } catch (e) {}
+    if (savedLang === 'en') applyLang('en');
+    langToggle.addEventListener('click', () => {
+      const next = document.documentElement.lang === 'en' ? 'pt' : 'en';
+      applyLang(next);
+      try { localStorage.setItem('pbi-lang', next); } catch (e) {}
+    });
+  }
 })();

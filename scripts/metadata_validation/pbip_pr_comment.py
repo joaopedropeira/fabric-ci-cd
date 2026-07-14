@@ -37,6 +37,7 @@ else:
     header = "# ✅ Validação de metadados PBIP passou\n\nA integridade e a sintaxe dos arquivos do projeto estão OK. O BPA prossegue."
 
 artifact_link = f"https://github.com/{REPO}/actions/runs/{RUN_ID}"
+artifact_section = f"\n\n📂 **Log completo da execução:** [Ver execução aqui]({artifact_link})\n"
 
 summary = (
     "\n\n### 📊 Resumo\n\n"
@@ -45,7 +46,6 @@ summary = (
     f"| ✅ Passou | {counts['pass']} |\n"
     f"| ⚠️ Aviso | {counts['warn']} |\n"
     f"| ❌ Falhou | {counts['fail']} |\n"
-    f"\n📂 **Log completo:** [Ver execução aqui]({artifact_link})\n"
 )
 
 # ---- Detail table -------------------------------------------------------
@@ -75,7 +75,7 @@ if problem_checks:
             details_md += f"- {d}\n"
         details_md += "\n</details>\n"
 
-comment_body = header + summary + table + details_md
+comment_body = header + artifact_section + summary + table + details_md
 
 # ---- Post comment -------------------------------------------------------
 headers = {

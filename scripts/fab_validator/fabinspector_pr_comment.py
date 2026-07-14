@@ -47,8 +47,15 @@ else:
     )
 
 artifact_link = f"https://github.com/{REPO}/actions/runs/{RUN_ID}"
-intro = (
-    f"\n\n📂 **Log completo e artefatos:** [Ver execução aqui]({artifact_link})\n"
+artifact_section = f"\n\n📂 **Log completo e artefatos:** [Ver execução aqui]({artifact_link})\n"
+
+status_icon = "❌" if FAILED else "✅"
+status_text = "Falhou" if FAILED else "Passou"
+summary = (
+    "\n\n### 📊 Resumo\n\n"
+    "| Verificação | Resultado |\n"
+    "|:-----------|:----------|\n"
+    f"| Regras de relatório (PBI Inspector) | {status_icon} {status_text} |\n"
     "\n> As regras validam a **camada visual** do relatório (nº de visuais por página, "
     "cores fora do tema, páginas ocultas, etc.) — complementar ao BPA, que valida o modelo.\n"
 )
@@ -56,13 +63,14 @@ intro = (
 if console:
     note = "\n\n_(saída truncada — veja o log completo da execução)_" if truncated else ""
     details = (
-        "\n<details open>\n<summary><strong>🔍 Resultado do Fab Inspector</strong></summary>\n\n"
+        "\n### 🔍 Detalhes\n"
+        "\n<details open>\n<summary><strong>Resultado do Fab Inspector</strong></summary>\n\n"
         f"```\n{console}\n```{note}\n</details>\n"
     )
 else:
-    details = "\n_(sem saída de console capturada)_\n"
+    details = "\n### 🔍 Detalhes\n\n_(sem saída de console capturada)_\n"
 
-comment_body = header + intro + details
+comment_body = header + artifact_section + summary + details
 
 headers = {
     "Authorization": f"Bearer {GITHUB_TOKEN}",
