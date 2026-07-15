@@ -43,7 +43,7 @@ modelos, de forma **automática** e **como código** (_pipeline-as-code_).
 
 A ideia central: tratar um projeto de Power BI como qualquer outro software. Ele vive no **Git**
 (no formato **PBIP**, versionável em texto), passa por **validações automáticas** a cada Pull Request
-e só chega ao ambiente de produção do **Fabric** depois de aprovado.
+e só chega ao ambiente de produção do **Fabric** após ser aprovado.
 
 ---
 
