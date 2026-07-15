@@ -315,8 +315,6 @@ fato, ative a _branch protection_ na `main`: `Settings → Branches → Add bran
 ## 📚 Referências e créditos
 
 - 🌐 **Página explicativa interativa (site público):** [white-meadow-0edcbf410.7.azurestaticapps.net](https://white-meadow-0edcbf410.7.azurestaticapps.net/) (código em [`web/`](web/)).
-- 🔗 **Projeto de referência que inspirou a implementação:**
-  [vlpatkosdani/powerbi-cicd-with-githubactions-demos](https://github.com/vlpatkosdani/powerbi-cicd-with-githubactions-demos).
 - 🧠 **Regras oficiais de BPA (Microsoft / Michael Kovalsky):**
   [Analysis-Services · BestPracticeRules](https://github.com/microsoft/Analysis-Services/tree/master/BestPracticeRules).
 - 🛠️ **Tabular Editor · Built-in BPA Rules:**
