@@ -13,6 +13,8 @@
 [![BPA Rules](https://img.shields.io/badge/BPA-regras_built--in-7C5CFF)](scripts/bpa/BPA_Rules.json)
 
 📖 **Página explicativa (interativa):** **[white-meadow-0edcbf410.7.azurestaticapps.net](https://white-meadow-0edcbf410.7.azurestaticapps.net/)**
+<br />
+<sub>💡 Para uma melhor experiência, acesse pelo Google Chrome.</sub>
 
 </div>
 
@@ -314,7 +316,7 @@ fato, ative a _branch protection_ na `main`: `Settings → Branches → Add bran
 
 ## 📚 Referências e créditos
 
-- 🌐 **Página explicativa interativa (site público):** [white-meadow-0edcbf410.7.azurestaticapps.net](https://white-meadow-0edcbf410.7.azurestaticapps.net/) (código em [`web/`](web/)).
+- 🌐 **Página explicativa interativa (site público):** [white-meadow-0edcbf410.7.azurestaticapps.net](https://white-meadow-0edcbf410.7.azurestaticapps.net/) (código em [`web/`](web/)). 💡 _Para uma melhor experiência, acesse pelo Google Chrome._
 - 🧠 **Regras oficiais de BPA (Microsoft / Michael Kovalsky):**
   [Analysis-Services · BestPracticeRules](https://github.com/microsoft/Analysis-Services/tree/master/BestPracticeRules).
 - 🛠️ **Tabular Editor · Built-in BPA Rules:**
