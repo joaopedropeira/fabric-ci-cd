@@ -1,12 +1,12 @@
 {
-  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
   "name": "VisualContainer4",
   "position": {
-    "x": 671.98676774638182,
-    "y": 128.29993108201242,
+    "x": 743.12336319779467,
+    "y": 195.62563749138525,
     "z": 4000,
-    "height": 241.35630599586491,
-    "width": 599.57987594762233
+    "height": 174.03059958649209,
+    "width": 528.44328049620958
   },
   "visual": {
     "visualType": "treemap",
