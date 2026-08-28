@@ -18,7 +18,7 @@
               {
                 "textRuns": [
                   {
-                    "value": "Team Scorecard:",
+                    "value": "Team Scorecard (By Region):",
                     "textStyle": {
                       "fontFamily": "Segoe UI Light",
                       "fontSize": "28pt"
